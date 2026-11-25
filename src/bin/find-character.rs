@@ -28,8 +28,9 @@
 //!        find-character --selftest      regression check against captures/
 use image::RgbaImage;
 use maple_tracker::avatar::{
-    binarize, judge, key_sprite, locate, probes, side_ink, sprite_score, trim, Fail, Geom, Sprite,
-    View, MAX_HUE_DOMINANCE, MAX_KEPT_FRAC, MAX_SIDE_INK, MIN_COLOURS, MIN_KEPT_FRAC, REF_H, REF_W,
+    below, binarize, judge, side_at, key_sprite, locate, probes, side_ink, sprite_score, trim, Fail, Geom, Sprite,
+    View, MAX_HUE_DOMINANCE, MAX_KEPT_FRAC, MAX_SIDE_INK, MIN_COLOURS, MIN_KEPT_FRAC, PLATE, REF_H,
+    REF_W,
 };
 
 /// The pipeline itself lives in `maple_tracker::avatar`, because the overlay
@@ -191,6 +192,7 @@ fn diagnose_at(img: &RgbaImage, ax: usize, ay: usize) {
         return;
     };
     let frame = binarize(&v, 0, 0, fw, g.ui_floor.min(fh));
+    let plate = below(&v, 0, 0, fw, g.ui_floor.min(fh), PLATE);
     if ax + tmpl.w > frame.w || ay + tmpl.h > frame.h {
         eprintln!("({ax}, {ay}) + template {}x{} falls outside the search area", tmpl.w, tmpl.h);
         return;
@@ -226,22 +228,14 @@ fn diagnose_at(img: &RgbaImage, ax: usize, ay: usize) {
         .count();
     println!("probes failing here: {bad} of {}", pr.len());
 
-    let side = side_ink(
-        &frame,
-        ax,
-        ay,
-        tmpl.w,
-        tmpl.h,
-        g.sprite_gap as usize,
-        (g.sprite_gap * 4) as usize,
-    );
+    let side = side_at(&frame, &plate, ax, ay, &tmpl, &g);
     println!("side ink beside the tag: {side:.3}");
     let profile: Vec<String> = [2u32, 4, 8, 16, 24, 32, 48]
         .iter()
         .map(|&r| {
             format!(
                 "{r}:{:.2}",
-                side_ink(&frame, ax, ay, tmpl.w, tmpl.h, g.sprite_gap as usize, r as usize)
+                side_ink(&frame, &plate, ax, ay, tmpl.w, tmpl.h, g.sprite_gap as usize, r as usize)
             )
         })
         .collect();
@@ -295,7 +289,12 @@ fn main() {
     let paths: Vec<&String> = positional[..positional.len().saturating_sub(skip_tail)].to_vec();
 
     let frame_path: String = paths.first().map(|s| s.to_string()).unwrap_or_else(|| "captures/frame.png".into());
-    let out_path: String = paths.get(1).map(|s| s.to_string()).unwrap_or_else(|| "ui/character.png".into());
+    // Not `ui/`. The panel's placeholder portrait lives there and is
+    // tracked, and this writes a cut of the player's real character over
+    // whatever it is pointed at — which is how a live sprite once ended up
+    // staged for commit. `captures/` is gitignored for exactly this.
+    let out_path: String =
+        paths.get(1).map(|s| s.to_string()).unwrap_or_else(|| "captures/character.png".into());
 
     let img = match image::open(&frame_path) {
         Ok(i) => i.to_rgba8(),
@@ -303,6 +302,26 @@ fn main() {
             eprintln!("could not open {frame_path}: {e}");
             std::process::exit(1);
         }
+    };
+    // `--native` puts the workbench on the same grid the overlay searches,
+    // using the overlay's own resampler rather than an imitation of it.
+    // Without this the two disagree about what the frame even looks like,
+    // and the workbench's verdict stops meaning anything.
+    let img = if argv.iter().any(|a| a == "--native") {
+        let (w, h) = img.dimensions();
+        let profile: maple_tracker::ocr::Profile =
+            serde_json::from_str(&std::fs::read_to_string("assets/profile.json").unwrap())
+                .expect("the profile parses");
+        let raw = img.into_raw();
+        let frame = maple_tracker::ocr::Frame { w, h, px: &raw };
+        let scale = profile.scale(w, h);
+        let (nw, nh) = scale.native(w, h);
+        let plate = maple_tracker::unstretch::plate_rgb(&frame, scale, 0, 0, nw, nh);
+        println!("native  : {w}x{h} -> {}x{}", plate.w, plate.h);
+        RgbaImage::from_raw(plate.w, plate.h, plate.pixels().to_vec())
+            .expect("the plate is rgba")
+    } else {
+        img
     };
     let (fw, fh) = img.dimensions();
     println!("frame   : {frame_path}  {fw}x{fh}");

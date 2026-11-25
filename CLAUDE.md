@@ -141,7 +141,7 @@ rebuilding.
 ## Build, run, install
 
 ```powershell
-cargo test                       # 70 tests
+cargo test                       # 72 tests
 cargo build --release            # -> target/release/maple-tracker.exe
 npx -y @tauri-apps/cli@2 build   # -> the installer, below
 ```
@@ -179,7 +179,8 @@ live game, so it carries the player's own and other players' character names.
 ## Where things stand
 
 Working and verified live: EXP, level, rate, time-to-level, session history,
-region theming from the minimap badge (reads ~117 deg), kill counting, and
+region theming from the minimap badge (reads ~117 deg), the character
+portrait (cut live on the first attempt, 66x80), kill counting, and
 the purse — read off the inventory's own meso total, verified across 160
 live frames (one plate readable out of twenty on screen, no false positives,
 and the readings tracked a real rising total: 984,239 -> 984,291 -> 984,345
@@ -304,6 +305,16 @@ on the label under the sprite — so the status bar's rendering *is* the
 search template, and no atlas or text recognition is needed. The box above
 the match is flood-filled inward from its border to key the background out.
 
+**The two renderings are the same font but not the same pixels.** The client
+filters the world layer and does not filter the UI layer, so the status bar's
+name arrives pixel-crisp — hard 2x2 blocks on a doubled frame — while the
+label under the sprite arrives soft-edged. Blown up side by side it is
+obvious. That caps the text score: the player's own tag measures in the mid
+eighties, never the high nineties, and about 60% of the template's ink finds
+a match. `ACCEPT` sits where it does because of this, and it is a shortlist
+rather than a verdict — `judge` decides. Do not read a mid-eighties score as
+a poor match; that is what a correct one looks like here.
+
 The hard part is not finding the name, it is finding the right one. The
 same string appears in chat, in a buddy list, on a shop sign, in another
 player's message, and those match the template just as well. Five
@@ -313,8 +324,37 @@ same name in chat has other text hard against it. Every bound is set a long
 way from what the real sprite measures, because a missing portrait for one
 more minute costs nothing and a confidently wrong one is ugly.
 
+`side_ink` has two rules in it that were both bought with a real failure.
+
+**It stops at the edge of the label's own plate.** Measuring raw brightness
+beyond that measures the game, not text. A live frame in a cave of bright
+yellow rock scored 0.13 against a limit of 0.10 and threw away a clean,
+isolated label — the ink it counted was the rock, several pixels past the
+plate. A neighbouring name is drawn on the *same* plate, so stopping at the
+plate's edge still finds it.
+
+**It measures near, not far.** Hard up against means hard up against.
+Averaged out to four times the sprite gap, a neighbour's text is diluted by
+the clear plate beyond it: two labels drawn over each other measured 0.06
+that way and would have been accepted. Over one gap the same pair measures
+0.19 where a clean label measures 0.07.
+
 `find-character` is the workbench over the same module — it prints every
-score and writes the PNG. Its `--selftest` currently fails: it expects
+score and writes the PNG. Two things about using it:
+
+- **`--native` runs it on the grid the overlay actually searches**, through
+  the overlay's own resampler. Without it the workbench reads the stretched
+  frame and the two disagree about what the frame even looks like. The same
+  cave label scores 84% stretched and fails, 87% native and succeeds. An
+  imitation of the resampling is not good enough either — downscaling by two
+  in an image editor puts it on a 1280x720 grid when `Profile::scale` says
+  1366x768, and it then finds nothing at all. `side_at` exists so the
+  measurement itself cannot drift between the two.
+- **It writes the cut to `captures/`, not `ui/`.** `ui/character.png` is the
+  tracked placeholder, and pointing the workbench at it stages a picture of
+  the player's real character for commit. That happened.
+
+Its `--selftest` currently fails: it expects
 `captures/frame.png` to be the 2560x1440 reference it was tuned on, and the
 file on disk has since been replaced with a 1920x1032 capture. `captures/`
 is gitignored, so that baseline cannot live in the repo as things stand.

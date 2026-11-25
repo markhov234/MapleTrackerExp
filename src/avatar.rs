@@ -29,6 +29,13 @@ use std::collections::HashSet;
 
 /// Luminance cut separating the light name glyphs from their dark plate.
 const INK: u8 = 150;
+/// Luminance below which a pixel could be the dark plate a name label is
+/// drawn on. Everything brighter is either a glyph or the game behind.
+pub const PLATE: u8 = 110;
+/// How much of a column must be plate-dark for that column to still count
+/// as part of the label's own plate. Below this the plate has ended and
+/// anything bright further out is scenery, not text.
+const PLATE_FLOOR: f32 = 0.25;
 /// Background flood tolerance, per channel.
 const KEY_TOL: i32 = 34;
 /// Text-match score a candidate must reach before we bother keying it.
@@ -151,10 +158,34 @@ impl Mask {
     pub fn at(&self, x: usize, y: usize) -> bool {
         self.bits[y * self.w + x]
     }
+
+    /// Build one from a predicate over its coordinates. For tests, and for
+    /// anything that needs a mask it did not read off a frame.
+    pub fn from_fn(w: usize, h: usize, f: impl Fn(usize, usize) -> bool) -> Mask {
+        let mut bits = Vec::with_capacity(w * h);
+        for y in 0..h {
+            for x in 0..w {
+                bits.push(f(x, y));
+            }
+        }
+        Mask { w, h, bits }
+    }
 }
 
 fn luma(p: [u8; 4]) -> u8 {
     ((p[0] as f32) * 0.299 + (p[1] as f32) * 0.587 + (p[2] as f32) * 0.114) as u8
+}
+
+/// Mask of everything darker than `cut` — the inverse sense of
+/// [`binarize`], for finding a label's plate rather than its glyphs.
+pub fn below(v: &View, x0: u32, y0: u32, w: u32, h: u32, cut: u8) -> Mask {
+    let mut bits = Vec::with_capacity((w * h) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            bits.push(luma(v.at(x0 + x, y0 + y)) < cut);
+        }
+    }
+    Mask { w: w as usize, h: h as usize, bits }
 }
 
 pub fn binarize(v: &View, x0: u32, y0: u32, w: u32, h: u32) -> Mask {
@@ -245,9 +276,29 @@ pub const MAX_HUE_DOMINANCE: f32 = 0.95;
 /// sprite-like as the real thing.
 ///
 /// `gap` skips the glyph antialiasing hard against the tag; `reach` is how
-/// far out to look.
+/// far out to look at most.
+///
+/// The walk stops at the edge of the label's own dark plate, which is what
+/// makes this mean "other text" rather than "bright pixels". A live frame
+/// in a cave of bright yellow rock measured 0.13 against a limit of 0.10
+/// and threw away a clean, isolated label — the ink it counted was the
+/// cave, several pixels past the end of the plate. A neighbouring name is
+/// drawn on the same plate, so stopping at the plate's edge still finds it.
+/// `side_ink` as `locate` measures it. One function so the workbench and
+/// the overlay cannot drift apart — they did, and the workbench went on
+/// printing a verdict the app would not have reached.
+pub fn side_at(frame: &Mask, plate: &Mask, mx: usize, my: usize, t: &Mask, g: &Geom) -> f32 {
+    // Hard up against means near. Averaged over four times the gap, a
+    // neighbour's text is diluted by the clear plate beyond it: two names
+    // drawn over each other measured 0.06 that way and would have been
+    // accepted. Over one gap the same pair measures 0.19 against a clean
+    // label's 0.07.
+    side_ink(frame, plate, mx, my, t.w, t.h, g.sprite_gap as usize, g.sprite_gap as usize)
+}
+
 pub fn side_ink(
     frame: &Mask,
+    plate: &Mask,
     mx: usize,
     my: usize,
     tw: usize,
@@ -255,23 +306,47 @@ pub fn side_ink(
     gap: usize,
     reach: usize,
 ) -> f32 {
+    let y0 = my;
+    let y1 = (my + th).min(frame.h);
+    if y1 <= y0 {
+        return 0.0;
+    }
+    let rows = y1 - y0;
+
+    // Walk out one column at a time and stop where the plate stops. A
+    // neighbouring name shares this label's plate, so the walk reaches it;
+    // the game behind does not, so the walk stops before counting it.
     let mut ink = 0usize;
     let mut seen = 0usize;
-    for y in my..(my + th).min(frame.h) {
-        for d in 0..reach {
-            if let Some(x) = mx.checked_sub(gap + 1 + d) {
-                seen += 1;
-                if frame.at(x, y) {
-                    ink += 1;
-                }
+    let mut step = |x: usize| -> bool {
+        let mut dark = 0usize;
+        let mut lit = 0usize;
+        for y in y0..y1 {
+            if plate.at(x, y) {
+                dark += 1;
             }
-            let x = mx + tw + gap + d;
-            if x < frame.w {
-                seen += 1;
-                if frame.at(x, y) {
-                    ink += 1;
-                }
+            if frame.at(x, y) {
+                lit += 1;
             }
+        }
+        if (dark as f32 / rows as f32) < PLATE_FLOOR {
+            return false;
+        }
+        seen += rows;
+        ink += lit;
+        true
+    };
+
+    for d in 0..reach {
+        match mx.checked_sub(gap + 1 + d) {
+            Some(x) if step(x) => {}
+            _ => break,
+        }
+    }
+    for d in 0..reach {
+        let x = mx + tw + gap + d;
+        if x >= frame.w || !step(x) {
+            break;
         }
     }
     if seen == 0 { 0.0 } else { ink as f32 / seen as f32 }
@@ -531,6 +606,9 @@ pub fn locate(v: &View, mut note: impl FnMut(String)) -> Result<Found, Fail> {
 
     // 2. search everything above the status-bar chrome
     let frame = binarize(v, 0, 0, fw, g.ui_floor.min(fh));
+    // The same slice again, keyed to the dark plate a name label sits on,
+    // so `side_ink` can tell where that plate ends.
+    let plate = below(v, 0, 0, fw, g.ui_floor.min(fh), PLATE);
     let pr = probes(&tmpl);
     let total = (tmpl.w * tmpl.h) as f32;
     let mut hits: Vec<(usize, usize, f32)> = Vec::new();
@@ -602,15 +680,7 @@ pub fn locate(v: &View, mut note: impl FnMut(String)) -> Result<Found, Fail> {
             rejected.push((mx, my, "sprite box keyed out entirely"));
             continue;
         };
-        let side = side_ink(
-            &frame,
-            mx as usize,
-            my as usize,
-            tmpl.w,
-            tmpl.h,
-            g.sprite_gap as usize,
-            (g.sprite_gap * 4) as usize,
-        );
+        let side = side_at(&frame, &plate, mx as usize, my as usize, &tmpl, &g);
         note(format!(
             "   cand ({mx}, {my}): text {:.1}%  kept {} ({:.0}%)  colours {}  \
              hue-dom {:.2}  side-ink {:.2}",
@@ -667,6 +737,44 @@ pub fn base64(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    /// The live false negative, pinned.
+    ///
+    /// A clean label alone on its plate, with bright cave rock beginning a
+    /// few pixels past the plate's edge. The old measurement walked out
+    /// into the rock and called it "more text hard up against the tag",
+    /// throwing away the only good frame of the session. The plate ends;
+    /// the measurement must end with it.
+    #[test]
+    fn bright_scenery_past_the_plate_is_not_text_beside_the_tag() {
+        let tag = (20usize, 10usize, 12usize, 8usize); // x, y, w, h
+        let (mx, my, tw, th) = tag;
+        // Plate runs six pixels either side of the tag, nothing beyond.
+        let plate = Mask::from_fn(80, 40, |x, y| {
+            y >= my && y < my + th && x + 6 >= mx && x < mx + tw + 6
+        });
+        // Rock: everything outside the plate is bright.
+        let frame = Mask::from_fn(80, 40, |x, y| !plate.at(x, y));
+
+        let side = side_ink(&frame, &plate, mx, my, tw, th, 1, 16);
+        assert!(side <= MAX_SIDE_INK, "scenery counted as text: {side:.3}");
+    }
+
+    /// And the true positive it has to keep catching: a neighbouring name
+    /// is drawn on the same plate, so the walk reaches it.
+    #[test]
+    fn another_name_on_the_same_plate_still_counts_as_text() {
+        let (mx, my, tw, th) = (20usize, 10usize, 12usize, 8usize);
+        let plate = Mask::from_fn(80, 40, |_, y| y >= my && y < my + th);
+        // Glyph-ish strokes beside the tag: every third column, on the
+        // plate, the way another label's letters would sit.
+        let frame = Mask::from_fn(80, 40, |x, y| {
+            plate.at(x, y) && (x < mx || x >= mx + tw) && x % 3 != 0
+        });
+
+        let side = side_ink(&frame, &plate, mx, my, tw, th, 1, 16);
+        assert!(side > MAX_SIDE_INK, "a neighbour's text went unnoticed: {side:.3}");
+    }
     use super::*;
 
     /// A flat frame has no name tag, and must say so rather than returning
