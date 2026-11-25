@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en" data-reduced-motion="false">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXP Calc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<svg class="vh" aria-hidden="true">
+  <defs>
+    <symbol id="i-calc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M8 7h8M8 12h2m3 0h3M8 16.5h2m3 0h3"/>
+    </symbol>
+    <symbol id="i-curve" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 20.5h17"/><path d="M4 17c3.5 0 5-2 7-6s3.5-6 8.5-6"/>
+    </symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2.6v2.3M12 19.1v2.3M21.4 12h-2.3M4.9 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4"/>
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m9 5 7 7-7 7"/>
+    </symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12h15M13 6l6 6-6 6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ---------- banner ---------- -->
+  <header class="banner">
+    <svg class="scene" viewBox="0 0 1600 118" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1C3427"/><stop offset="100%" stop-color="#0D1B15"/>
+        </linearGradient>
+        <radialGradient id="glow" cx="0.74" cy="0.1" r="0.55">
+          <stop offset="0%" stop-color="#A9CE61" stop-opacity="0.26"/>
+          <stop offset="100%" stop-color="#A9CE61" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1600" height="118" fill="url(#sky)"/>
+      <rect width="1600" height="118" fill="url(#glow)"/>
+      <!-- far ridge -->
+      <path d="M0 86 L120 62 L240 80 L380 54 L520 78 L660 58 L800 82 L960 60 L1100 84 L1250 62 L1400 80 L1600 58 L1600 118 L0 118 Z"
+            fill="#162B20" opacity="0.85"/>
+      <!-- mid conifers -->
+      <g fill="#1A3326" opacity="0.95">
+        <path d="M90 100 L112 52 L134 100 Z"/><path d="M160 100 L178 64 L196 100 Z"/>
+        <path d="M300 100 L326 46 L352 100 Z"/><path d="M372 100 L390 68 L408 100 Z"/>
+        <path d="M600 100 L624 50 L648 100 Z"/><path d="M668 100 L686 70 L704 100 Z"/>
+        <path d="M900 100 L926 48 L952 100 Z"/><path d="M980 100 L998 68 L1016 100 Z"/>
+        <path d="M1210 100 L1236 52 L1262 100 Z"/><path d="M1290 100 L1308 70 L1326 100 Z"/>
+        <path d="M1460 100 L1486 46 L1512 100 Z"/>
+      </g>
+      <!-- near conifers -->
+      <g fill="#0F2419">
+        <path d="M20 118 L52 56 L84 118 Z"/><path d="M210 118 L238 70 L266 118 Z"/>
+        <path d="M430 118 L466 48 L502 118 Z"/><path d="M700 118 L730 66 L760 118 Z"/>
+        <path d="M1040 118 L1076 54 L1112 118 Z"/><path d="M1340 118 L1370 68 L1400 118 Z"/>
+        <path d="M1540 118 L1572 58 L1604 118 Z"/>
+      </g>
+      <!-- fireflies -->
+      <g fill="#A9CE61">
+        <circle cx="268" cy="40" r="1.6" opacity="0.55"/><circle cx="742" cy="30" r="1.3" opacity="0.4"/>
+        <circle cx="1128" cy="44" r="1.7" opacity="0.5"/><circle cx="1396" cy="28" r="1.2" opacity="0.35"/>
+        <circle cx="520" cy="34" r="1.4" opacity="0.45"/>
+      </g>
+      <rect y="116" width="1600" height="2" fill="#A9CE61" opacity="0.12"/>
+    </svg>
+    <div class="banner-inner">
+      <div class="wordmark">
+        <h1>EXP Calc</h1>
+        <span class="tag">MapleStory Classic</span>
+      </div>
+      <div class="banner-meta">
+        <span>Level cap</span><b>100</b>
+        <span aria-hidden="true">&middot;</span>
+        <span>Curve</span><b>verified</b>
+      </div>
+    </div>
+  </header>
+
+  <div class="main" id="main" data-assistant="open">
+
+    <!-- ---------- sidebar ---------- -->
+    <nav class="sidebar" aria-label="Sections">
+      <p class="nav-label" id="navlabel">Sections</p>
+      <button class="nav-item" data-view="calculator" aria-current="page">
+        <svg class="ico" aria-hidden="true"><use href="#i-calc"/></svg><span>Calculator</span>
+      </button>
+      <button class="nav-item" data-view="curve">
+        <svg class="ico" aria-hidden="true"><use href="#i-curve"/></svg><span>EXP Curve</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg><span>Settings</span>
+      </button>
+      <button class="nav-item" data-view="about">
+        <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg><span>About</span>
+      </button>
+      <div class="sidebar-foot">
+        Curve computed from four formulas, verified against all 99 published levels.
+      </div>
+    </nav>
+
+    <!-- ---------- content ---------- -->
+    <main class="content">
+
+      <!-- Calculator -->
+      <section class="view" data-view="calculator" data-active="true" aria-labelledby="h-calc">
+        <div class="view-head">
+          <h2 id="h-calc">Calculator</h2>
+          <p>Work out what a target level actually costs, how long it takes at your measured rate, and what a party does to your EXP per kill.</p>
+        </div>
+
+        <div class="split">
+          <!-- inputs -->
+          <div>
+            <div class="card">
+              <div class="card-head"><h3>Your position</h3></div>
+              <div class="fields">
+                <div class="row2">
+                  <div class="field">
+                    <label for="f-level">Current level</label>
+                    <input type="number" id="f-level" min="1" max="99" step="1" value="40">
+                  </div>
+                  <div class="field">
+                    <label for="f-target">Target level</label>
+                    <input type="number" id="f-target" min="2" max="100" step="1" value="50">
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label for="f-expmode">EXP into this level</label>
+                  <div class="seg" id="f-expmode" role="group" aria-label="EXP entry mode">
+                    <button type="button" data-mode="abs" aria-pressed="true">Absolute</button>
+                    <button type="button" data-mode="pct" aria-pressed="false">Percent</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="f-exp"><span id="f-exp-label">EXP banked</span><span class="unit" id="f-exp-unit">of 294,216</span></label>
+                  <input type="number" id="f-exp" min="0" step="1" value="763">
+                </div>
+
+                <div class="field">
+                  <label for="f-rate">Measured EXP per hour<span class="unit">from your grind log</span></label>
+                  <input type="number" id="f-rate" min="0" step="1000" value="120000">
+                </div>
+
+                <div class="field">
+                  <label for="f-mobexp">Mob base EXP<span class="unit">solo value</span></label>
+                  <input type="number" id="f-mobexp" min="0" step="1" value="85">
+                </div>
+              </div>
+
+              <details class="adv">
+                <summary>Party and multipliers</summary>
+                <div class="fields">
+                  <div class="row2">
+                    <div class="field">
+                      <label for="f-party">Eligible members</label>
+                      <input type="number" id="f-party" min="1" max="6" step="1" value="1">
+                    </div>
+                    <div class="field">
+                      <label for="f-attackers">Who hit it</label>
+                      <input type="number" id="f-attackers" min="1" max="6" step="1" value="1">
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="f-levelsum">Sum of eligible levels<span class="unit">blank = even party</span></label>
+                    <input type="number" id="f-levelsum" min="1" step="1" placeholder="auto">
+                  </div>
+                  <div class="field">
+                    <label for="f-dmg">Your share of party damage<span class="unit"><b id="f-dmg-out">100</b>%</span></label>
+                    <input type="range" id="f-dmg" min="0" max="100" step="1" value="100">
+                  </div>
+                  <div class="field">
+                    <label for="f-mult">EXP multiplier<span class="unit">coupons, events</span></label>
+                    <input type="number" id="f-mult" min="0.1" max="20" step="0.1" value="1">
+                  </div>
+                </div>
+              </details>
+
+              <button class="btn btn-primary" id="go">Calculate</button>
+            </div>
+          </div>
+
+          <!-- results -->
+          <div id="results" aria-live="polite">
+            <div class="headline">
+              <span class="cap" id="r-cap">Time to level 50</span>
+              <div class="big" id="r-time">&mdash;</div>
+              <div class="sub" id="r-sub">&mdash;</div>
+            </div>
+
+            <div class="tiles">
+              <div class="tile accent"><div class="k">EXP needed</div><div class="v" id="r-total">&mdash;</div><div class="n" id="r-total-n">to target</div></div>
+              <div class="tile"><div class="k">Kills needed</div><div class="v" id="r-kills">&mdash;</div><div class="n" id="r-kills-n">at effective rate</div></div>
+              <div class="tile"><div class="k">EXP per kill</div><div class="v" id="r-permob">&mdash;</div><div class="n" id="r-permob-n">solo</div></div>
+              <div class="tile"><div class="k">Kills per hour</div><div class="v" id="r-kph">&mdash;</div><div class="n">implied by your rate</div></div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>This level</h3>
+                <span class="hint" id="r-band">&mdash;</span>
+              </div>
+              <div class="progress-wrap">
+                <div class="progress-top">
+                  <span>Level <b id="r-lv">40</b></span>
+                  <span><b id="r-pct">0.26</b>% &middot; <b id="r-rem">&mdash;</b> to go</span>
+                </div>
+                <div class="bar"><i id="r-bar" style="width:0%"></i></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>Progression</h3>
+                <span class="hint">EXP per level, log scale</span>
+              </div>
+              <svg class="chart" id="chart-plan" viewBox="0 0 720 240" role="img" aria-label="EXP cost per level with your current and target levels marked"></svg>
+              <div class="legend">
+                <span><i style="background:var(--c-text-faint)"></i>Full curve</span>
+                <span><i style="background:var(--c-accent)"></i>Your span</span>
+                <span><i style="background:var(--c-border-strong)"></i>Formula band change</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>Level by level</h3><span class="hint" id="r-steps-n">&mdash;</span></div>
+              <div class="tablewrap">
+                <table>
+                  <thead><tr><th>Level</th><th>EXP</th><th>Cumulative</th><th>Elapsed</th><th class="band">Band</th></tr></thead>
+                  <tbody id="r-steps"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EXP Curve -->
+      <section class="view" data-view="curve" aria-labelledby="h-curve">
+        <div class="view-head">
+          <h2 id="h-curve">EXP Curve</h2>
+          <p>Every level from 1 to 99. Levels 1&ndash;89 match pre-Big-Bang MapleStory; from 90 each level costs 2.1&times; the one before, which is where almost all of the climb lives.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Cost per level</h3><span class="hint">log scale</span></div>
+          <svg class="chart" id="chart-curve" viewBox="0 0 980 300" role="img" aria-label="EXP required per level from 1 to 99 on a logarithmic scale"></svg>
+          <div class="legend">
+            <span><i style="background:var(--c-band-quad)"></i>Quadratic, Lv 1&ndash;50</span>
+            <span><i style="background:var(--c-band-slow)"></i>1.0548&times;, Lv 51&ndash;89</span>
+            <span><i style="background:var(--c-band-fast)"></i>2.1&times;, Lv 90&ndash;99</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Full table</h3><span class="hint">your level is highlighted</span></div>
+          <div class="tablewrap" style="max-height:440px;overflow-y:auto">
+            <table>
+              <thead><tr><th>Level</th><th>EXP to next</th><th>Cumulative to reach</th><th class="band">Band</th></tr></thead>
+              <tbody id="curve-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="view" data-view="settings" aria-labelledby="h-set">
+        <div class="view-head">
+          <h2 id="h-set">Settings</h2>
+          <p>Preferences are stored on this machine only.</p>
+        </div>
+        <div class="card prose">
+          <div class="setting">
+            <div class="txt"><b>Assistant panel</b><p>Shows recommendations derived from your numbers. Turning it off changes no result.</p></div>
+            <button class="switch" id="s-assistant" role="switch" aria-checked="true" aria-label="Assistant panel"></button>
+          </div>
+          <div class="setting">
+            <div class="txt"><b>Reduced motion</b><p>Removes transitions and animated bar fills. Follows your system setting automatically; this forces it on.</p></div>
+            <button class="switch" id="s-motion" role="switch" aria-checked="false" aria-label="Reduced motion"></button>
+          </div>
+          <div class="setting">
+            <div class="txt"><b>Compact numbers</b><p>Show 12.3M instead of 12,300,000 in stat tiles. Tables always show full precision.</p></div>
+            <button class="switch" id="s-compact" role="switch" aria-checked="false" aria-label="Compact numbers"></button>
+          </div>
+          <div class="setting">
+            <div class="txt"><b>Live recalculation</b><p>Recalculate as you type instead of waiting for the Calculate button.</p></div>
+            <button class="switch" id="s-live" role="switch" aria-checked="true" aria-label="Live recalculation"></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="view" data-view="about" aria-labelledby="h-about">
+        <div class="view-head">
+          <h2 id="h-about">About</h2>
+          <p>How the numbers are produced, and what this program does and does not touch.</p>
+        </div>
+        <div class="card prose">
+          <h3>The curve</h3>
+          <p>The level table is not shipped as data. It is computed from four piecewise formulas and checked against all 99 published values and the cumulative total before release:</p>
+          <ul class="rule-list">
+            <li>Levels 1&ndash;5 &mdash; <code>(floor(L&sup2; / 2) + 15) &times; L</code></li>
+            <li>Levels 6&ndash;50 &mdash; <code>q = floor(L&sup2; / 3)</code>, then <code>(q + 19) &times; q</code></li>
+            <li>Levels 51&ndash;89 &mdash; <code>trunc(previous &times; 1.0548)</code></li>
+            <li>Levels 90&ndash;99 &mdash; <code>trunc(previous &times; 2.1)</code></li>
+          </ul>
+          <p>The recursive bands multiply by an integer and divide last, because <code>previous &times; 1.0548</code> in binary floating point can land a hair under the true value and truncate to the wrong integer.</p>
+
+          <h3>Party EXP</h3>
+          <p>80% of the pool is split by level and 20% by damage dealt, then a size bonus is added to your share. The bonus is 10% per extra eligible member, capped at 30%, plus 5% per extra member who actually damaged the monster.</p>
+          <p>Because the damage term is continuous, party EXP does not arrive in clean multiples of a single value. That is why a tracker cannot count your kills from EXP alone while you are in a party.</p>
+
+          <h3>What this program touches</h3>
+          <ul class="rule-list">
+            <li>No game process memory is read.</li>
+            <li>No keystrokes or clicks are ever sent.</li>
+            <li>No network traffic is captured or inspected.</li>
+            <li>No game files are read or modified.</li>
+          </ul>
+          <p>The assistant runs locally as a set of rules over the numbers on screen. It sends nothing anywhere, and every figure it quotes comes from the same deterministic engine as the panels beside it.</p>
+          <p>Fan-made. Not affiliated with or endorsed by Nexon.</p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ---------- assistant ---------- -->
+    <aside class="assistant" id="assistant" aria-label="Assistant">
+      <div class="assistant-head">
+        <svg class="mascot" viewBox="0 0 40 40" aria-hidden="true">
+          <ellipse cx="20" cy="33" rx="11" ry="2.5" fill="#000" opacity="0.25"/>
+          <path d="M20 7c6 0 10 4.6 10 10.5S26 31 20 31 10 23.4 10 17.5 14 7 20 7Z" fill="#1C3427" stroke="#A9CE61" stroke-width="1.4"/>
+          <path d="M20 7c0-3 1.6-5 4-5.6-.4 2.5.2 4.3 1.6 5.4-1.8.5-3.7.6-5.6.2Z" fill="#A9CE61"/>
+          <circle cx="16.2" cy="17.5" r="1.9" fill="#F4F1E8"/>
+          <circle cx="23.8" cy="17.5" r="1.9" fill="#F4F1E8"/>
+          <path d="M17.5 23c1.6 1.2 3.4 1.2 5 0" stroke="#A9CE61" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+          <circle cx="12.6" cy="21.6" r="1.3" fill="#A9CE61" opacity="0.4"/>
+          <circle cx="27.4" cy="21.6" r="1.3" fill="#A9CE61" opacity="0.4"/>
+        </svg>
+        <div class="assistant-title">
+          <div class="t">Assistant</div>
+          <div class="s">Local rules, no network</div>
+        </div>
+        <button class="icon-btn" id="a-toggle" aria-label="Collapse assistant" aria-expanded="true">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-chev"/></svg>
+        </button>
+      </div>
+
+      <div class="assistant-body" id="a-body">
+        <div class="assistant-scroll" id="a-scroll">
+          <div>
+            <p class="sect-label">Recommendations</p>
+            <div id="a-recs" style="display:grid;gap:var(--s-2);margin-top:var(--s-2)"></div>
+          </div>
+          <div>
+            <p class="sect-label">Ask</p>
+            <div class="chips" id="a-chips" style="margin-top:var(--s-2)"></div>
+          </div>
+          <div id="a-log" style="display:grid;gap:var(--s-3)"></div>
+        </div>
+        <form class="composer" id="a-form">
+          <label class="vh" for="a-input">Ask the assistant</label>
+          <input type="text" id="a-input" placeholder="Ask about your plan..." autocomplete="off">
+          <button class="btn" type="submit" aria-label="Send">
+            <svg width="16" height="16" aria-hidden="true"><use href="#i-send"/></svg>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script src="exp.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

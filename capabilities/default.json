@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the overlay window. Tauri 2 allows the app's own commands by default but gates core APIs behind the capability system, so without this the frontend cannot subscribe to the tracker's session events, and the header's drag region cannot move the window.",
+  "windows": ["overlay"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-start-dragging"
+  ]
+}

@@ -1,0 +1,9 @@
+/target
+
+# Working data, not source: full-screen shots of a live game, which carry the
+# player's own and other players' character names. Teaching frames are
+# collected with `harvest` when they are needed.
+/captures
+
+# Tauri regenerates these from tauri.conf.json and the capabilities.
+/gen/schemas

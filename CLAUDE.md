@@ -1,0 +1,217 @@
+# EXP Calc
+
+A Windows desktop overlay that watches a MapleStory window and reports EXP,
+level, rate, time-to-level, kills and loot for a play session. Tauri 2 shell,
+Rust core, plain HTML/JS panel.
+
+It reads the game **by looking at it**. Nothing else.
+
+## The boundary (read this before adding anything)
+
+This program may:
+
+- capture pixels of the game window through the Windows compositor
+  (`windows-capture`), the same path a screen recorder uses;
+- receive one registered global hotkey.
+
+It must **never**:
+
+- read or write game process memory (`OpenProcess`, `ReadProcessMemory`);
+- synthesise input (`SendInput`, `keybd_event`, `PostMessage` to the client);
+- capture, proxy or inspect network traffic;
+- read, patch or ship game files.
+
+Every feature in here has been built inside that line, including the ones
+where it was genuinely inconvenient. If a feature seems to need crossing it,
+the answer is that the feature doesn't happen — not that the line moves. Say
+so plainly rather than building a version that quietly cheats.
+
+The same rule governs the third-party program that was reverse engineered for
+reference (see "Prior art" below): **static analysis only, never run, never
+redistributed.**
+
+## How it reads the screen
+
+Three ideas do most of the work. Understanding them is most of understanding
+the codebase.
+
+### 1. Unstretch (`src/unstretch.rs`)
+
+The client renders at a fixed internal resolution and Windows scales the
+window up. A 2560x1440 window is often the client's own 1280x720 doubled. Read
+pixels straight off that and the bitmap font is a blurred mess that only
+matches templates approximately.
+
+So: resample back onto the client's own grid first, and the font becomes
+*exact*. Two invariants that cost real time to find —
+
+- the grid is anchored at the **frame origin**, not at the region being read;
+- resampling happens on **grey/colour values, before thresholding**. Shrinking
+  an already-thresholded bitmap averages serifs away; it once collapsed `[`
+  and `]` into the same glyph.
+
+`Profile::scale(w, h)` derives the scale, `candidates()` offers the plausible
+grids, and the right one is whichever verifies (below). There are no hardcoded
+coordinates and no per-resolution calibration: the client was taught at
+1366x768 and reads fine at 1280x720 with no changes.
+
+Plates come in flavours because different measurements want different
+channels: `plate()` (luma), `plate_with(f)` (any measure — `warm` = `min(R,G)`
+separates the pale-grey and gold notice text from green foliage), `plate_rgb()`
+(colour preserved, for the region badge and slot icons).
+
+### 2. Find things by content, verify by arithmetic
+
+The EXP field is located by **shape** — `<digits>[<digits>.<digits>%]` — and
+then confirmed by the identity that must hold between the absolute EXP and the
+percentage at that level. `ocr::locate()` is the shared entry point and also
+answers "is this even the right window?": the test is not "the frame is
+2560x1440", it is "a readout exists whose number divides into its percentage".
+
+**The worst bug in this project's history came from skipping that check.** The
+reader has a clean path (every glyph recognised) and a reconciling path
+(some unknown). The arithmetic check lived only in the reconciling path. An
+unstretch improvement made the clean path always taken, so the only check
+became unreachable, and the session reported **2,993,820,528 EXP gained**.
+`agrees()` now guards both paths and `Session::observe` caps a delta at the
+level's own total. Four tests cover it, including that literal number. Don't
+remove them.
+
+### 3. A half-taught reader must say so, not guess
+
+Each reader is gated on an `enabled` flag in the profile and refuses to
+produce numbers from glyphs it hasn't been taught. `native-atlas teach`
+**refuses to write** an atlas where two characters share a bitmap. Zero kills
+because nothing died and zero kills because nothing is being counted must not
+look alike — hence `Snapshot::counting`.
+
+The one deliberate exception, added last: an EXP notice whose *sentence* reads
+but whose *digits* don't still counts as a kill, with `amount: None`. That a
+monster died and what it paid are separate evidence; losing the second
+shouldn't destroy the first. `exp_per_kill` divides by `kills_valued` so
+unpriced kills don't drag the average down. See the module docs in
+`src/chat.rs`.
+
+## Layout
+
+| File | What it holds |
+|---|---|
+| `src/unstretch.rs` | the grid, scales, plates |
+| `src/ocr.rs` | `Profile`, glyph cutting and classification, `locate()`, `read_rows()` |
+| `src/chat.rs` | turning OCR'd lines into events and tallies (`classify`, `Log`, `Tally`) |
+| `src/tracker.rs` | the capture loop; one native path, all readers driven from here |
+| `src/session.rs` | live state and `Snapshot`, the single struct the UI receives |
+| `src/history.rs` | `sessions.jsonl` + `current.json` checkpointing |
+| `src/region.rs` | minimap badge -> region hue |
+| `src/slots.rs` | quick slot bar: find the panel, cut icons, mask counts |
+| `src/expcurve.rs` | EXP-to-next-level table |
+| `src/notes.rs` | file logging; a release build has no console, so `note!` is the only way to see anything |
+| `ui/overlay.html` | the panel |
+| `ui/theme.js` | region hue rotation — **only hue moves**, so contrast can't drift |
+| `ui/mapdata.js` | map recommendations (hysteresis + throttle; it used to flicker) |
+| `assets/profile.json` | everything taught: atlas, thresholds, band geometry, per-reader `enabled` |
+
+`assets/profile.json` is `include_str!`'d into the binary. Editing it means
+rebuilding.
+
+## Build, run, install
+
+```powershell
+cargo test                       # 64 tests
+cargo build --release            # -> target/release/maple-tracker.exe
+npx -y @tauri-apps/cli@2 build   # -> the installer, below
+```
+
+The bundler writes `target/release/EXP Calc.exe` and
+`target/release/bundle/nsis/EXP Calc_0.1.0_x64-setup.exe`. **`cargo build`
+alone does not refresh `EXP Calc.exe`** — three test cycles were once wasted
+on a stale copy of it. Install silently with `/S`; it lands in
+`%LOCALAPPDATA%\EXP Calc` for the current user only, no admin.
+
+Log and data: `%APPDATA%\com.maplertracker.expcalc\` —
+`exp-calc.log`, `sessions.jsonl`, `current.json`. An uninstall can take that
+folder with it, so **back up `sessions.jsonl`, not just `current.json`**,
+before any reinstall. (It was lost once that way.)
+
+### The workbench
+
+Calibration tools are behind a feature flag so a release build can't carry
+them: `cargo run --features tools --bin <name>`.
+
+- `list-windows`, `find-character`, `capture-spike`, `read-stats`, `sample-exp`
+- `native-atlas` — teach the status-bar font
+- `notice-atlas` — teach the floating EXP/meso lines (`show`, `teach --at Y H --text "..."`, `read`, `events`)
+- `minimap-atlas`, `slots-atlas` — region badge and quick slots
+- `harvest` — **watches the live game and saves only frames where the watched
+  band changed** (`harvest notices 600`, `harvest slots 600`). Built because
+  teaching needs frames with real text in them, and asking the player to pose
+  for them yields a narrow sample from one map at one moment.
+
+`captures/` is working data and is gitignored: it is full-screen shots of a
+live game, so it carries the player's own and other players' character names.
+
+## Where things stand
+
+Working and verified live: EXP, level, rate, time-to-level, session history,
+region theming from the minimap badge (reads ~117 deg), quick slot icons shown
+in the panel, kill counting switched on.
+
+**Known gaps, roughly in order of what's worth doing next.**
+
+1. **Finish the notice font.** 26 characters taught; missing digits
+   **2 3 4 6 8** and letters **B f A R T**. Until then every kill counts but
+   EXP-per-kill only averages the legible ones, and mesos from notices are
+   mostly dropped. Run `harvest notices 600` while actually fighting, then
+   `notice-atlas teach`. This is the cheapest unblock left.
+   - `B A R T f` matter specifically for `Bonus EXP for PARTY (+n)`. Until
+     they're taught that line reads as `?onus EXP ?or ?AR?Y`, which is why the
+     kill rule requires the literal word `received` rather than merely the
+     absence of `bonus`/`party` — otherwise a party bonus double-counts every
+     monster. Don't loosen that rule before teaching those letters.
+2. **Potions used (HP and MP).** The original ask, still not done. The slot
+   icons are read and displayed; the **counts** are not. They are white digits
+   with a 1px black outline, ~4x8 native px, sitting over both a white panel
+   background and coloured icons — the outline is the discriminator, *not* the
+   blue channel (the background is white too; that assumption cost a cycle).
+   Potions-used = count decreasing. Telling HP from MP is best done by
+   watching which bar jumps when a count drops, which needs HP/MP reading
+   restored — it was lost when `rois` and the `H`/`M`/`P`/`/` glyphs were
+   dropped in the unstretch rewrite.
+3. **Monster kill attribution and images.** The Monsters tab has no data path
+   at all — `S.monsters` is never populated from any snapshot field. The
+   floating lines never name the monster, so identity needs a nametag reader.
+   Images cannot be cropped from the screen; see "Prior art".
+4. Smaller: mesos spent isn't readable (could be estimated), the Inter font
+   isn't bundled, map data stops at level 60.
+
+## Prior art
+
+A third-party tracker ("Meso Pal") was reverse engineered **statically** for
+reference — never run, never redistributed; its own README forbids
+redistribution. Worth knowing, so the same ground isn't covered twice:
+
+- It has **no quick-slot reader and no potion-use counter.** Potions appear
+  only in a translation name table. Reading the slots is novel work; there is
+  no reference implementation to lean on.
+- It counts kills from the same floating `You received EXP (+` lines, and its
+  schema is `minute_rollups(character, minute, map, monster, kills, ...)` with
+  `monster INTEGER`, with queries that explicitly handle `monster = 0` —
+  **unknown monster**. Kills are counted whether or not the monster is
+  identified. That pattern is what justified the `amount: None` kill above.
+- **Monster pictures are bundled game assets** (`game-data/mob-sprites.bin`,
+  `sprites/NN.png`, `backdrops/<mapId>.png`), keyed by monster id, with
+  identity from a nametag reader. Nothing clever is cropped off the screen.
+  Bundling or fetching assets here is an open decision, not a solved problem.
+
+## Working notes
+
+- Measure before diagnosing. Guesses in this codebase have a poor record: the
+  slot icons resending every 2s was blamed on two wrong causes before
+  measurement showed 7 of 8 slots byte-identical and the 8th differing by 4.6%
+  because its count was ticking. `differs()` now excludes the count band.
+- Thresholds compared against moving inputs need hysteresis. The map
+  recommendation flickered because `betterBy > 0.05` sat right on a trailing
+  average.
+- `grep -c` exits 1 when it finds nothing, which silently breaks `&&` chains.
+- Prefer a test that pins the real failure (a literal bad number, a real
+  misread line) over a test that restates the implementation.

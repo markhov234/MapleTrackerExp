@@ -1,0 +1,114 @@
+/* ============================================================
+   EXP Calc — design tokens
+   Dark Earth Green / Cozy Korean Fantasy RPG.
+
+   Every component style resolves through these. No component
+   rule may hardcode a colour, size or radius literal.
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* --- core palette (fixed by the design system) --- */
+  --c-bg:        #0D1B15;
+  --c-surface:   #14261D;
+  --c-elevated:  #1C3427;
+  --c-accent:    #A9CE61;
+  --c-text:      #F4F1E8;
+
+  /* --- derived neutrals: ivory desaturated toward the forest --- */
+  --c-text-muted: #A8B59C;
+  --c-text-dim:   #74836B;
+  --c-text-faint: #4D5A47;
+
+  /* --- derived greens --- */
+  --c-accent-soft:   rgba(169, 206, 97, 0.12);
+  --c-accent-softer: rgba(169, 206, 97, 0.06);
+  --c-accent-line:   rgba(169, 206, 97, 0.30);
+  --c-accent-deep:   #7FA343;
+  --c-accent-text:   #C3E088;
+
+  /* --- borders: subtle green, never grey --- */
+  --c-border:        rgba(169, 206, 97, 0.13);
+  --c-border-strong: rgba(169, 206, 97, 0.26);
+  --c-divider:       rgba(169, 206, 97, 0.08);
+
+  /* --- semantic, kept distinct from the accent --- */
+  --c-good:  #8FD694;
+  --c-warn:  #E0B457;
+  --c-alert: #DB8A6B;
+  --c-info:  #7FB8C4;
+
+  /* --- formula band hues for the curve view --- */
+  --c-band-quad: #7FB8C4;
+  --c-band-slow: #A9CE61;
+  --c-band-fast: #DB8A6B;
+
+  /* --- typography --- */
+  --font-sans: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-num:  "Inter", "Segoe UI", system-ui, sans-serif;
+
+  --fs-micro: 11px;
+  --fs-small: 13px;
+  --fs-body:  15px;
+  --fs-lead:  16px;
+  --fs-h3:    18px;
+  --fs-h2:    24px;
+  --fs-h1:    36px;
+  --fs-stat:  30px;
+  --fs-hero:  44px;
+
+  --lh-tight: 1.15;
+  --lh-snug:  1.35;
+  --lh-body:  1.55;
+
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semi:    600;
+  --fw-bold:    700;
+
+  --ls-caps: 0.085em;
+  --ls-tight: -0.015em;
+
+  /* --- spacing scale --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 44px;
+
+  /* --- radius --- */
+  --r-xs: 4px;
+  --r-sm: 7px;
+  --r-md: 11px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* --- elevation: minimal, never heavy --- */
+  --sh-none: none;
+  --sh-low:  0 1px 2px rgba(0, 0, 0, 0.30);
+  --sh-mid:  0 4px 14px rgba(0, 0, 0, 0.32);
+  --sh-pop:  0 10px 30px rgba(0, 0, 0, 0.45);
+  --ring:    0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-accent);
+
+  /* --- layout --- */
+  --w-sidebar:   214px;
+  --w-inputs:    360px;
+  --w-assistant: 330px;
+  --h-banner:    118px;
+  --maxw:        1760px;
+
+  /* --- motion (zeroed under reduced motion) --- */
+  --t-fast: 110ms;
+  --t-mid:  200ms;
+  --ease:   cubic-bezier(0.32, 0.72, 0.35, 1);
+}
+
+/* Honour both the OS setting and the in-app Settings toggle. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --t-fast: 0ms; --t-mid: 0ms; }
+}
+:root[data-reduced-motion="true"] { --t-fast: 0ms; --t-mid: 0ms; }

@@ -1,0 +1,89 @@
+[package]
+name = "maple-tracker"
+version = "0.1.0"
+edition = "2024"
+# Several binaries live here, but only one of them is the product. Without
+# this the bundler cannot tell which to install.
+default-run = "maple-tracker"
+
+[features]
+# The workbench: teaching the font, inspecting captures, listing windows.
+# These are how the profile gets made, not part of what gets shipped, so a
+# release build does not compile them and the installer cannot carry them by
+# accident. Run one with `cargo run --features tools --bin native-atlas`.
+tools = ["dep:image"]
+
+[dependencies]
+# Local calendar boundaries. Day, week and month roll-ups have to agree with
+# the wall clock the player reads, and "midnight" is a timezone question.
+chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+# Only the workbench reads and writes PNGs; the overlay is handed pixels
+# by the compositor and never opens a file.
+image = { version = "0.25.10", default-features = false, features = ["png"], optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = { version = "2.12.7", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.4.1"
+windows-capture = "2.0.1"
+
+[[bin]]
+name = "maple-tracker"
+path = "src/main.rs"
+
+[[bin]]
+name = "capture-spike"
+path = "src/bin/capture-spike.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "chat-atlas"
+path = "src/bin/chat-atlas.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "find-character"
+path = "src/bin/find-character.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "list-windows"
+path = "src/bin/list-windows.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "native-atlas"
+path = "src/bin/native-atlas.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "minimap-atlas"
+path = "src/bin/minimap-atlas.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "harvest"
+path = "src/bin/harvest.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "slots-atlas"
+path = "src/bin/slots-atlas.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "notice-atlas"
+path = "src/bin/notice-atlas.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "read-stats"
+path = "src/bin/read-stats.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "sample-exp"
+path = "src/bin/sample-exp.rs"
+required-features = ["tools"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.6", features = [] }

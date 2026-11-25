@@ -1,0 +1,63 @@
+{
+  "productName": "EXP Calc",
+  "mainBinaryName": "EXP Calc",
+  "version": "0.1.0",
+  "identifier": "com.maplertracker.expcalc",
+  "build": {
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "overlay",
+        "url": "overlay.html",
+        "title": "EXP Calc",
+        "width": 424,
+        "height": 780,
+        "minWidth": 360,
+        "minHeight": 420,
+        "resizable": true,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": false,
+        "shadow": false,
+        "center": false,
+        "visible": true,
+        "focus": false,
+        "maximizable": false,
+        "minimizable": false
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "EXP Calc",
+    "copyright": "EXP Calc",
+    "category": "Utility",
+    "shortDescription": "Session EXP tracker for MapleStory",
+    "longDescription": "A small always-on-top overlay that reports your EXP rate, time to level and session totals. It reads the game's status bar from the screen the same way a person does: no game memory is read, no input is sent, no network traffic is inspected and no game file is touched.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
+  }
+}

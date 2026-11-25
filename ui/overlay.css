@@ -1,0 +1,447 @@
+/* ============================================================
+   Overlay panel — floats over the game, toggled by a hotkey.
+   Tokens come from tokens.css; nothing here hardcodes a colour.
+   ============================================================ */
+
+.stage {
+  position: fixed; inset: 0;
+  background: #000 center/cover no-repeat;
+  overflow: hidden;
+}
+.stage::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+}
+.stage-note {
+  position: absolute; left: 16px; bottom: 14px; z-index: 3;
+  font-size: var(--fs-micro);
+  color: rgba(244, 241, 232, 0.72);
+  background: rgba(13, 27, 21, 0.72);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  padding: var(--s-2) var(--s-4);
+  backdrop-filter: blur(4px);
+}
+.stage-note kbd {
+  font: inherit;
+  background: var(--c-elevated);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+  color: var(--c-accent-text);
+}
+
+/* ---------- the panel ---------- */
+
+.panel {
+  position: absolute;
+  top: 18px; right: 18px; z-index: 4;
+  width: 418px;
+  max-height: calc(100% - 36px);
+  display: flex; flex-direction: column;
+  background: rgba(20, 38, 29, 0.93);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-pop);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+  transition: opacity var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
+}
+.panel[hidden] { display: none; }
+.panel.away { opacity: 0; transform: translateX(14px) scale(0.99); pointer-events: none; }
+
+/* With the recommendation card and the third tile row in, the panel can be
+   taller than a short window. Scroll the body and pin the chrome, rather than
+   squeezing the breakdown list to nothing or pushing the footer off-screen. */
+.panel { overflow-y: auto; overflow-x: hidden; }
+
+/* The platform scrollbar is a light grey bar down the right edge. On a page
+   it is a control; on an overlay with a 1px border and rounded corners it
+   reads as a grey border stuck to one side of the panel. Thin and tinted to
+   the accent so it stays a scrollbar. */
+.panel { scrollbar-width: thin; scrollbar-color: rgba(169, 206, 97, 0.30) transparent; }
+.panel::-webkit-scrollbar { width: 6px; }
+.panel::-webkit-scrollbar-track { background: transparent; }
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(169, 206, 97, 0.30);
+  border-radius: var(--r-pill);
+}
+.panel::-webkit-scrollbar-thumb:hover { background: rgba(169, 206, 97, 0.50); }
+
+.p-head {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--c-divider);
+  flex: none;
+  position: sticky; top: 0; z-index: 3;
+  background: rgba(20, 38, 29, 0.97);
+}
+.p-head .leaf { width: 17px; height: 17px; color: var(--c-accent); }
+.p-head .nm { font-weight: var(--fw-semi); font-size: var(--fs-small); letter-spacing: var(--ls-tight); }
+.p-head .sp { flex: 1; }
+.p-head .dom { font-size: var(--fs-micro); color: var(--c-text-faint); }
+
+/* character */
+.who-row {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-4);
+  flex: none;
+}
+.avatar {
+  width: 48px; height: 58px; flex: none;
+  border-radius: var(--r-sm);
+  background: var(--c-elevated);
+  border: 1px solid var(--c-border);
+  display: grid; place-items: end center;
+  overflow: hidden;
+}
+/* The sprite is pixel art lifted straight off the client, so it must not be
+   smoothed when scaled. */
+.avatar img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+}
+.avatar .fallback { color: var(--c-accent); align-self: center; }
+
+/* ---------- minimised bar ---------- */
+
+.mini { display: none; }
+.panel[data-mode="mini"] > *:not(.mini) { display: none; }
+.panel[data-mode="mini"] { }
+.panel[data-mode="mini"] .mini {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  width: 100%;
+}
+.mini-av {
+  width: 34px; height: 42px; flex: none;
+  object-fit: contain; image-rendering: pixelated;
+  display: block;
+}
+.mini-main { flex: 1; min-width: 0; }
+.mini-t {
+  font-size: 22px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight); line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: var(--c-accent);
+}
+.mini-s {
+  font-size: var(--fs-micro); color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mini-track {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: rgba(13, 27, 21, 0.75);
+}
+.mini-track > i { display: block; height: 100%; background: var(--c-accent); }
+
+/* ---------- where-to-farm recommendation ---------- */
+
+.reco {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: rgba(13, 27, 21, 0.5);
+  border: 1px solid var(--c-border);
+  border-left: 2px solid var(--c-info);
+  border-radius: var(--r-sm);
+}
+.reco[hidden] { display: none; }
+.reco-top {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-2);
+}
+.reco-lbl {
+  font-size: var(--fs-micro); text-transform: uppercase;
+  letter-spacing: var(--ls-caps); font-weight: var(--fw-semi);
+  color: var(--c-info);
+}
+.reco-toggle {
+  background: none; border: 0; cursor: pointer; padding: 0;
+  font-size: var(--fs-micro); color: var(--c-text-dim);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.reco-toggle:hover { color: var(--c-accent-text); }
+.reco-name {
+  font-size: var(--fs-body); font-weight: var(--fw-semi);
+  letter-spacing: var(--ls-tight); margin-top: 2px;
+}
+.reco-line {
+  font-size: var(--fs-small); color: var(--c-text-muted);
+  line-height: var(--lh-snug); margin-top: 2px;
+}
+.reco-line b { color: var(--c-accent-text); font-variant-numeric: tabular-nums; }
+.reco-meta {
+  font-size: var(--fs-micro); color: var(--c-text-faint);
+  margin-top: 3px;
+  display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3);
+}
+.reco-more { margin-top: var(--s-3); border-top: 1px solid var(--c-divider); padding-top: var(--s-2); }
+.reco-more[hidden] { display: none; }
+.reco-alt {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: var(--s-2); align-items: baseline;
+  padding: var(--s-2) 0;
+  font-size: var(--fs-small);
+  border-bottom: 1px solid var(--c-divider);
+}
+.reco-alt:last-child { border-bottom: 0; }
+.reco-alt .an { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reco-alt .am { font-size: var(--fs-micro); color: var(--c-text-faint); }
+.reco-alt .av { font-variant-numeric: tabular-nums; color: var(--c-text-muted); white-space: nowrap; }
+.reco-note {
+  margin-top: var(--s-2); font-size: var(--fs-micro);
+  color: var(--c-text-faint); line-height: var(--lh-snug);
+}
+.who { flex: 1; min-width: 0; }
+.who .n { font-size: var(--fs-lead); font-weight: var(--fw-semi); letter-spacing: var(--ls-tight); }
+.who .j { font-size: var(--fs-small); color: var(--c-text-muted); }
+.who .state { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-micro); margin-top: 3px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c-good); flex: none; }
+.dot.idle { background: var(--c-warn); }
+.dot.off  { background: var(--c-text-faint); }
+.state .lbl { color: var(--c-text-muted); }
+
+.btn-s {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-sm);
+  color: var(--c-text-muted);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.btn-s:hover { border-color: var(--c-accent-line); color: var(--c-accent-text); }
+
+/* ranges */
+.ranges { display: flex; gap: var(--s-1); padding: 0 var(--s-4); flex-wrap: wrap; flex: none; }
+.range {
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--fs-micro); font-weight: var(--fw-medium);
+  color: var(--c-text-dim); cursor: pointer;
+}
+.range:hover { color: var(--c-text); }
+.range[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }
+
+.since {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: var(--s-3) var(--s-4) var(--s-2);
+  font-size: var(--fs-micro); color: var(--c-text-dim);
+  flex: none;
+}
+.since button {
+  background: none; border: 0; cursor: pointer;
+  color: var(--c-text-dim); font-size: var(--fs-micro);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.since button:hover { color: var(--c-accent-text); }
+
+/* hero: the number the whole app exists for */
+.hero {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--c-accent-line);
+  border-radius: var(--r-md);
+  background: linear-gradient(155deg, rgba(169, 206, 97, 0.11), rgba(169, 206, 97, 0.02));
+  flex: none;
+}
+.hero .t {
+  font-size: 32px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight); line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-accent);
+}
+.hero .u { font-size: var(--fs-small); color: var(--c-text-muted); margin-top: 2px; }
+.hero .bar {
+  height: 6px; margin-top: var(--s-3);
+  background: rgba(13, 27, 21, 0.8);
+  border-radius: var(--r-pill); overflow: hidden;
+}
+.hero .bar > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--c-accent-deep), var(--c-accent));
+  transition: width var(--t-mid) var(--ease);
+}
+.hero .pc {
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-micro); color: var(--c-text-dim); margin-top: var(--s-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* stat grid */
+.grid3 {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2); padding: 0 var(--s-4) var(--s-3);
+  flex: none;
+}
+.cell {
+  background: rgba(13, 27, 21, 0.55);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  padding: var(--s-3);
+  min-width: 0;
+}
+.cell .v {
+  font-size: 19px; font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums; letter-spacing: var(--ls-tight);
+  line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cell .k { font-size: var(--fs-micro); color: var(--c-text-dim); margin-top: 2px; }
+.cell .v.pos { color: var(--c-good); }
+.cell .v.neg { color: var(--c-alert); }
+
+/* breakdown */
+.tabs {
+  display: flex; gap: var(--s-4);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--c-divider);
+  flex: none;
+}
+.tab {
+  background: none; border: 0; cursor: pointer;
+  padding: var(--s-3) 0;
+  font-size: var(--fs-small); font-weight: var(--fw-medium);
+  color: var(--c-text-dim);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--c-text); }
+.tab[aria-selected="true"] { color: var(--c-text); border-bottom-color: var(--c-accent); }
+.tab b { color: var(--c-text-faint); font-weight: var(--fw-regular); margin-left: 3px; }
+.tab[aria-selected="true"] b { color: var(--c-accent); }
+
+.search { padding: var(--s-3) var(--s-4); flex: none; }
+.search input {
+  width: 100%;
+  background: rgba(13, 27, 21, 0.7);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  color: var(--c-text);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-small);
+}
+.search input::placeholder { color: var(--c-text-faint); }
+.search input:focus-visible { border-color: var(--c-accent); }
+
+.list { padding: 0 var(--s-4) var(--s-3); flex: none; }
+.li {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: var(--s-3); align-items: center;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--c-divider);
+  font-size: var(--fs-small);
+}
+.li:last-child { border-bottom: 0; }
+.li .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.li .ct { font-variant-numeric: tabular-nums; color: var(--c-text); font-weight: var(--fw-medium); }
+.li .sh { font-variant-numeric: tabular-nums; color: var(--c-text-dim); font-size: var(--fs-micro); width: 36px; text-align: right; }
+.li .meter { grid-column: 1 / -1; height: 3px; background: rgba(13,27,21,0.8); border-radius: var(--r-pill); overflow: hidden; }
+.li .meter > i { display: block; height: 100%; background: var(--c-accent-deep); }
+.empty { color: var(--c-text-dim); font-size: var(--fs-small); padding: var(--s-5) 0; line-height: var(--lh-snug); }
+
+/* foot */
+.p-foot {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--c-divider);
+  flex: none;
+  position: sticky; bottom: 0; z-index: 3;
+  background: rgba(20, 38, 29, 0.97);
+  margin-top: auto;
+}
+.hotkey {
+  flex: 1;
+  display: flex; align-items: center; gap: var(--s-2);
+  background: rgba(13, 27, 21, 0.6);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-micro); color: var(--c-text-dim);
+}
+.hotkey kbd {
+  font: inherit; margin-left: auto;
+  background: var(--c-elevated);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-xs);
+  padding: 1px 5px; color: var(--c-text-muted);
+}
+.btn-recap {
+  background: var(--c-accent); border: 1px solid var(--c-accent);
+  color: #0D1B15; font-weight: var(--fw-semi); font-size: var(--fs-small);
+  border-radius: var(--r-sm); padding: var(--s-2) var(--s-5);
+  cursor: pointer; display: inline-flex; align-items: center; gap: var(--s-2);
+}
+.btn-recap:hover { background: var(--c-accent-text); }
+/* Quiet by default — it is the one control that throws the session away, so it
+   should not compete with Recap for the eye. It only turns warm once armed. */
+.btn-quit {
+  background: transparent; border: 1px solid var(--c-border);
+  color: var(--c-text-dim); font-weight: var(--fw-semi); font-size: var(--fs-small);
+  border-radius: var(--r-sm); padding: var(--s-2) var(--s-4);
+  cursor: pointer; white-space: nowrap;
+}
+.btn-quit:hover { color: var(--c-text); border-color: var(--c-text-dim); }
+.btn-quit[data-armed="1"] {
+  background: rgba(196, 92, 72, 0.18);
+  border-color: #C45C48; color: #E8A79A;
+}
+.icon-s {
+  width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center;
+  background: transparent; border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); color: var(--c-text-dim); cursor: pointer;
+}
+.icon-s:hover { border-color: var(--c-accent-line); color: var(--c-accent); }
+
+.recap {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--c-border);
+  border-left: 2px solid var(--c-accent);
+  border-radius: var(--r-sm);
+  background: rgba(13, 27, 21, 0.6);
+  font-size: var(--fs-small);
+  color: var(--c-text-muted);
+  line-height: var(--lh-snug);
+  flex: none;
+}
+.recap b { color: var(--c-text); font-variant-numeric: tabular-nums; }
+.recap[hidden] { display: none; }
+
+/* A one-line nudge, not a warning: the overlay works perfectly well
+   without it, and only the colour is on offer. */
+.hint {
+  margin: 10px 14px 0;
+  padding: 7px 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--c-text-dim);
+  background: var(--c-accent-softer);
+  border: 1px solid var(--c-divider);
+  border-radius: 7px;
+}
+
+/* The quick slot bar, lifted off the player's own screen. Pixel art, so it
+   is scaled by whole numbers and never smoothed. */
+.slots { margin: 10px 14px 0; }
+.slots-k {
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--c-text-faint);
+  margin-bottom: 5px;
+}
+.slots-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.slot-ic {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  border: 1px solid var(--c-divider);
+  border-radius: 5px;
+  background: var(--c-elevated);
+}
