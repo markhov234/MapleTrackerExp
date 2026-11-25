@@ -112,6 +112,35 @@ fn review(
     Ok(state.history.review(Some(&current), now))
 }
 
+/// Open the map database in the user's own browser.
+///
+/// Takes no URL on purpose. A command that opens whatever address the page
+/// hands it is a command that opens whatever address anything that can
+/// reach the page hands it, and this webview renders text read off the
+/// game screen. There is exactly one page worth linking to, so the command
+/// knows it and the page does not get a say.
+#[tauri::command]
+fn open_map_database() -> Result<(), String> {
+    const URL: &str = "https://meowdb.com/msclassic/maps";
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        // Through the shell's own URL handler rather than `cmd /c start`,
+        // which would involve a command interpreter for no reason.
+        std::process::Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", URL])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("not supported on this platform".into())
+    }
+}
+
 /// Quit for real, from the tray's Quit item or the panel's footer button.
 ///
 /// The tray icon is removed first. A tray icon is owned by the app handle and
@@ -209,7 +238,7 @@ fn main() {
     let hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyE);
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![set_mini, hide_app, quit_app, range_totals, review])
+        .invoke_handler(tauri::generate_handler![set_mini, hide_app, quit_app, range_totals, review, open_map_database])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcut(hotkey)

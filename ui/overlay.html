@@ -95,23 +95,14 @@
       <button class="btn-s" id="c-pause">Pause</button>
     </div>
 
-    <div class="ranges" role="group" aria-label="Time range">
-      <button class="range" data-r="session" aria-pressed="true">Session</button>
-      <button class="range" data-r="today" aria-pressed="false">Today</button>
-      <button class="range" data-r="week" aria-pressed="false">Week</button>
-      <button class="range" data-r="month" aria-pressed="false">Month</button>
-      <button class="range" data-r="all" aria-pressed="false">All time</button>
-    </div>
-
     <div class="since">
-      <span id="s-since">Since 7:12 p.m.</span>
+      <span id="s-since">&mdash;</span>
       <button id="s-reset">Reset</button>
     </div>
 
 <!-- The two numbers somebody glances at mid-fight: how long until the
-         level, and how fast it is going. Everything else on the panel is
-         read deliberately; these two are read at a glance, so they are the
-         same size and nothing shares the row. -->
+         level, and how fast it is going. Nothing shares the row, and
+         nothing below is allowed to grow to this size. -->
     <div class="hero">
       <div class="hero-pair">
         <div class="big">
@@ -127,10 +118,6 @@
       <div class="pc"><span id="h-pct">&mdash;</span><span id="h-rem">&mdash;</span></div>
     </div>
 
-    <div class="hint" id="theme-hint" hidden>
-      Expand the minimap to colour the panel by region.
-    </div>
-
     <div class="reco" id="reco" hidden>
       <div class="reco-top">
         <span class="reco-lbl">Faster at your level</span>
@@ -141,21 +128,29 @@
       <div class="reco-meta" id="reco-meta"></div>
       <div class="reco-more" id="reco-more" hidden></div>
       <p class="reco-note" id="reco-note"></p>
+      <!-- The panel says a map is worth going to; MeowDB says how to get
+           there and what lives on it. One is the reason to click the other,
+           so the link belongs on this card and nowhere else. -->
+      <button class="reco-cta" id="reco-cta">
+        Look it up on MeowDB
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17 17 7M9 7h8v8"/>
+        </svg>
+      </button>
     </div>
 
-    <div class="grid3">
-      <div class="cell"><div class="v" id="t-played">1h 47m</div><div class="k">played</div></div>
-      <div class="cell"><div class="v" id="t-exp">156,218</div><div class="k">EXP</div></div>
-      <div class="cell"><div class="v" id="t-rate">87,432</div><div class="k">EXP / hour</div></div>
-      <div class="cell"><div class="v" id="t-kills">3,412</div><div class="k">kills</div></div>
-      <div class="cell"><div class="v pos" id="t-meso">+243,920</div><div class="k">mesos, net</div></div>
-      <div class="cell"><div class="v" id="t-pots">70</div><div class="k">potions</div></div>
-      <div class="cell"><div class="v" id="t-dps">541</div><div class="k" id="t-dps-k">DPS, effective</div></div>
-      <div class="cell"><div class="v" id="t-mesohr">136,593</div><div class="k">mesos / hour</div></div>
-      <div class="cell"><div class="v" id="t-deaths">0</div><div class="k">deaths</div></div>
-      <div class="cell"><div class="v" id="t-tolvl">&mdash;</div><div class="k">kills to level</div></div>
-      <div class="cell"><div class="v" id="t-expkill">&mdash;</div><div class="k">EXP / kill</div></div>
-      <div class="cell"><div class="v" id="t-party">&mdash;</div><div class="k">party bonus</div></div>
+    <div class="hint" id="theme-hint" hidden>
+      Expand the minimap to colour the panel by region.
+    </div>
+
+<!-- Four figures, and only the four that were asked for. A dash here
+         means the reader for it is not finished, which is deliberately not
+         the same as a zero. -->
+    <div class="grid2">
+      <div class="cell"><div class="v" id="t-played">&mdash;</div><div class="k">played</div></div>
+      <div class="cell"><div class="v" id="t-kills">&mdash;</div><div class="k">monsters killed</div></div>
+      <div class="cell"><div class="v pos" id="t-meso">&mdash;</div><div class="k">mesos picked up</div></div>
+      <div class="cell"><div class="v" id="t-sold">&mdash;</div><div class="k" id="t-sold-k">mesos from sales</div></div>
     </div>
 
 <!-- Last time and this week. A session that vanishes when you quit is
@@ -169,30 +164,20 @@
       <div class="week-last" id="week-last">&mdash;</div>
     </div>
 
-    <div class="recap" id="recap" hidden></div>
-
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" data-t="monsters" aria-selected="true">Monsters <b id="n-monsters">3</b></button>
-      <button class="tab" role="tab" data-t="items" aria-selected="false">Items <b id="n-items">7</b></button>
-      <button class="tab" role="tab" data-t="maps" aria-selected="false">Maps <b id="n-maps">2</b></button>
-      <button class="tab" role="tab" data-t="potions" aria-selected="false">Potions <b id="n-potions">2</b></button>
-    </div>
-
-    <div class="search">
-      <label class="vh" for="q" style="position:absolute;width:1px;height:1px;overflow:hidden">Filter</label>
-      <input type="text" id="q" placeholder="Search..." autocomplete="off">
+      <button class="tab" role="tab" data-t="monsters" aria-selected="true">Killed <b id="n-monsters">0</b></button>
+      <button class="tab" role="tab" data-t="items" aria-selected="false">Picked up <b id="n-items">0</b></button>
     </div>
 
     <div class="list" id="list"></div>
 
     <div class="p-foot">
       <div class="hotkey">Toggle panel <kbd>Ctrl+Shift+E</kbd></div>
-      <button class="btn-recap" id="b-recap">Recap</button>
       <!-- Quit lives down here, not in the header: the header's × minimises,
            and quitting discards the session totals, so it should take a
            deliberate trip to the far end of the panel. -->
       <button class="btn-quit only-tauri" id="b-quit" title="Quit EXP Calc — this ends the session">Quit</button>
-      <button class="icon-s" id="b-cfg" aria-label="Settings">
+      <button class="icon-s" id="b-cfg" aria-label="Switch between the dark and light theme" title="Dark / light">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
           <circle cx="12" cy="12" r="3"/>
           <path d="M12 2.6v2.3M12 19.1v2.3M21.4 12h-2.3M4.9 12H2.6M18.6 5.4 17 7M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4" stroke-linecap="round"/>
@@ -257,7 +242,7 @@
       { n: "White Potion", c: 48 }, { n: "Blue Potion", c: 22 }
     ]
   };
-  var tab = "monsters", filter = "";
+  var tab = "monsters";
 
   // The Rust side sends (name, count) pairs; the list renderer wants {n, c}.
   function pairs(v) {
@@ -279,63 +264,7 @@
   }
   var n = EXP.formatExp;
 
-  // The hero's subtitle is rewritten for a roll-up and has to come back
-  // intact for the session view, so the original markup is kept rather than
-  // reassembled.
-  var HERO_U = null;
-
-  /// A roll-up replaces the headline and the three measured tiles. The rest
-  /// of the panel — the level bar, the recommendation, the mob — is about
-  /// right now, and a week's total says nothing about any of it, so it is
-  /// left alone.
-  /// Put the hero's markup back before anything reads it.
-  ///
-  /// The roll-up writes plain text over the subtitle, which destroys the
-  /// `#h-next` element inside it — and `render` reads `#h-next` three lines
-  /// in, long before the range handling at the bottom. So this runs
-  /// unconditionally at the top of every render, whatever range is showing,
-  /// and `applyRange` overwrites it again at the end if it needs to.
-  /// Restoring only on the way back to Session was not enough: switching from
-  /// one roll-up straight to another threw on the missing element and aborted
-  /// the render, leaving the panel frozen on the previous range.
-  function restoreHero() {
-    if (HERO_U === null) HERO_U = $("h-u").innerHTML;
-    if (!document.getElementById("h-next")) $("h-u").innerHTML = HERO_U;
-    $("h-barwrap").style.display = "";
-  }
-
-  function applyRange() {
-    var T = S.totals;
-    if (S.range === "session" || !T) return;
-    var when = T.sessions === 0
-      ? "Nothing recorded yet"
-      : "Since " + new Date(T.since * 1000).toLocaleString([], {
-          month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
-        });
-    $("s-since").textContent = when;
-
-    $("h-time").textContent = dur(T.active_secs);
-    $("h-rate").textContent = n(Math.round(T.rate));
-    $("h-u").textContent =
-      T.sessions + (T.sessions === 1 ? " session" : " sessions") +
-      (T.levels ? ", " + T.levels + (T.levels === 1 ? " level" : " levels") + " gained" : "") +
-      " grinding";
-    // The bar is progress through the current level, which a month's total
-    // has nothing to say about.
-    $("h-barwrap").style.display = "none";
-    $("h-pct").textContent = n(T.exp) + " EXP";
-    $("h-rem").textContent = T.levels + (T.levels === 1 ? " level" : " levels");
-
-    $("t-played").textContent = dur(T.active_secs);
-    $("t-exp").textContent = n(T.exp);
-    $("t-rate").textContent = n(Math.round(T.rate));
-
-    $("m-time").textContent = dur(T.active_secs);
-    $("m-sub").textContent = n(Math.round(T.rate)) + " EXP/hr " + S.range;
-  }
-
   function render() {
-    restoreHero();
     var cost = EXP.toNext[S.level];
     var remaining = cost - S.expInto;
     var pct = (S.expInto / cost) * 100;
@@ -360,24 +289,6 @@
         : "Lv " + S.level + " · " + n(Math.round(S.rate)) + " EXP/hr";
     $("m-bar").style.width = pct.toFixed(2) + "%";
 
-    // Effective DPS needs no kill count and no mob HP lookup at runtime: the
-    // mob's HP-per-EXP ratio turns measured EXP/hour straight into damage.
-    // Unknown mob means a clear rate instead of a made-up number.
-    var dps = MAPS.effectiveDps(S.rate, S.mob);
-    if (dps) {
-      $("t-dps").textContent = n(Math.round(dps));
-      $("t-dps-k").textContent = "DPS on " + S.mob;
-    } else {
-      var kpm = (S.kills !== null && S.playedSec > 0) ? S.kills / (S.playedSec / 60) : 0;
-      $("t-dps").textContent = kpm > 0 ? kpm.toFixed(1) : DASH;
-      $("t-dps-k").textContent = S.mob ? "kills / min" : "needs the mob";
-    }
-    var hrs = S.playedSec / 3600;
-    $("t-mesohr").textContent = (S.mesoEarned !== null && hrs > 0)
-      ? n(Math.round((S.mesoEarned - S.mesoSpent) / hrs))
-      : DASH;
-    $("t-deaths").textContent = S.deaths === null ? DASH : S.deaths;
-
     renderReco(remaining);
 
     // Live capture derives EXP, level, rate and time. Anything it does not
@@ -387,27 +298,25 @@
     var un = function (v) { return (v === null || v === undefined) ? DASH : n(v); };
 
     $("t-played").textContent = dur(S.playedSec);
-    $("t-exp").textContent = n(S.expGained);
-    $("t-rate").textContent = n(Math.round(S.rate));
     $("t-kills").textContent = un(S.kills);
     var mEl = $("t-meso");
     if (S.mesoEarned === null) {
       mEl.textContent = DASH;
       mEl.className = "v";
     } else {
-      var net = S.mesoEarned - S.mesoSpent;
-      mEl.textContent = (net >= 0 ? "+" : "−") + n(Math.abs(net));
-      mEl.className = "v " + (net >= 0 ? "pos" : "neg");
+      mEl.textContent = "+" + n(S.mesoEarned);
+      mEl.className = "v pos";
     }
-    $("t-tolvl").textContent = S.killsToLevel ? n(S.killsToLevel) : DASH;
-    $("t-expkill").textContent = S.expPerKill ? n(Math.round(S.expPerKill)) : DASH;
-    $("t-party").textContent = (S.expBonus === null || S.expBonus === undefined)
+    // Mesos from selling is a different number from mesos picked up, and
+    // nothing reads it yet: the client does not float a line for a sale the
+    // way it does for a drop, so it has to come off the shop window. A dash
+    // and a reason, never a zero that looks like a quiet evening.
+    $("t-sold").textContent = S.mesoSold === null || S.mesoSold === undefined
       ? DASH
-      : "+" + n(S.expBonus);
-
-    $("t-pots").textContent = S.potions === null
-      ? DASH
-      : n(S.potions.reduce(function (a, p) { return a + p.c; }, 0));
+      : "+" + n(S.mesoSold);
+    $("t-sold-k").textContent = S.mesoSold === null || S.mesoSold === undefined
+      ? "mesos sold — not read yet"
+      : "mesos from sales";
 
     // "Paused" is the user's choice; everything else is the tracker telling
     // us what it can or cannot see. Conflating them made a failed reading
@@ -424,13 +333,8 @@
 
     // These can be null while live capture has nothing for them yet, and a
     // throw here would abort the rest of the render.
-    $("n-monsters").textContent = (S.monsters || []).length;
+    $("n-monsters").textContent = S.kills === null ? "0" : n(S.kills);
     $("n-items").textContent = (S.items || []).length;
-    $("n-maps").textContent = (S.maps || []).length;
-    $("n-potions").textContent = (S.potions || []).length;
-
-    // Last, so a roll-up overwrites the live figures rather than racing them.
-    applyRange();
 
     renderList();
   }
@@ -588,23 +492,29 @@
   }
 
   function renderList() {
-    var rows = S[tab] || [];
-    var isTime = tab === "maps";
-    var q = filter.trim().toLowerCase();
-    var shown = rows.filter(function (r) { return !q || r.n.toLowerCase().indexOf(q) > -1; });
-    var total = rows.reduce(function (a, r) { return a + r.c; }, 0) || 1;
+    var rows = (S[tab] || []).slice();
     var host = $("list");
     host.textContent = "";
 
-    if (!shown.length) {
+    // Kills are counted from the floating EXP lines, which say that
+    // something died and never say what. So a kill with no name is still a
+    // kill, listed as one, rather than quietly dropped or quietly attached
+    // to whatever was killed last.
+    if (tab === "monsters" && !rows.length && S.kills) {
+      rows = [{ n: "Unidentified", c: S.kills }];
+    }
+    var total = rows.reduce(function (a, r) { return a + r.c; }, 0) || 1;
+
+    if (!rows.length) {
       var e = document.createElement("p");
       e.className = "empty";
-      e.textContent = q
-        ? "Nothing matching “" + filter + "”."
-        : "Nothing yet this session. Play with tracking on and it counts up here.";
+      e.textContent = tab === "monsters"
+        ? "Nothing killed yet this session."
+        : "Nothing picked up yet this session.";
       host.appendChild(e);
       return;
     }
+    var shown = rows;
 
     shown.slice().sort(function (a, b) { return b.c - a.c; }).forEach(function (r) {
       var share = (r.c / total) * 100;
@@ -612,7 +522,7 @@
       d.className = "li";
       var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = r.n;
       var ct = document.createElement("span"); ct.className = "ct";
-      ct.textContent = isTime ? dur(r.c) : n(r.c);
+      ct.textContent = n(r.c);
       var sh = document.createElement("span"); sh.className = "sh"; sh.textContent = Math.round(share) + "%";
       var mt = document.createElement("span"); mt.className = "meter";
       var fill = document.createElement("i"); fill.style.width = share.toFixed(1) + "%";
@@ -635,15 +545,9 @@
     S.mesoEarned = 0; S.mesoSpent = 0;
     S.monsters = []; S.items = []; S.maps = []; S.potions = [];
     S.expPerKill = null; S.killsToLevel = null; S.expBonus = null; S.expFromChat = null;
-    $("recap").hidden = true;
     render();
   });
 
-  // The ranges read filed sessions off disk, not the live one. Refetched on
-  // every switch and on a timer while a roll-up is showing, so "today" climbs
-  // as you play rather than jumping when you quit — the running session is
-  // counted alongside the filed ones on the Rust side.
-  var rangeTimer = null;
   /* ---- last session, and the week ---------------------------------------
      The live session already shows on the panel. What it cannot show is
      whether tonight is better than last night, which is the question that
@@ -699,25 +603,16 @@
     t.core.invoke("review").then(renderWeek).catch(function () {});
   }
 
-  function fetchTotals() {
+  $("reco-toggle").addEventListener("click", function () { recoOpen = !recoOpen; render(); });
+
+  // Opening a browser is the app's job, not the page's: a webview that can
+  // navigate itself away from the overlay is a webview that can be talked
+  // into it. The command takes no URL — it builds the one address it is
+  // allowed to open.
+  $("reco-cta").addEventListener("click", function () {
     var t = window.__TAURI__;
-    if (!t || !t.core || !t.core.invoke) return;
-    t.core.invoke("range_totals", { range: S.range })
-      .then(function (r) { S.totals = r; render(); })
-      .catch(function () { S.totals = null; render(); });
-  }
-  function setRange(r) {
-    S.range = r;
-    [].forEach.call(document.querySelectorAll(".range"), function (o) {
-      o.setAttribute("aria-pressed", String(o.getAttribute("data-r") === r));
-    });
-    if (rangeTimer) { clearInterval(rangeTimer); rangeTimer = null; }
-    if (r === "session") { S.totals = null; render(); return; }
-    fetchTotals();
-    rangeTimer = setInterval(fetchTotals, 10000);
-  }
-  [].forEach.call(document.querySelectorAll(".range"), function (b) {
-    b.addEventListener("click", function () { setRange(b.getAttribute("data-r")); });
+    if (t && t.core && t.core.invoke) t.core.invoke("open_map_database").catch(function () {});
+    else window.open("https://meowdb.com/msclassic/maps", "_blank", "noopener");
   });
 
   [].forEach.call(document.querySelectorAll(".tab"), function (b) {
@@ -730,24 +625,34 @@
     });
   });
 
-  $("q").addEventListener("input", function () { filter = this.value; renderList(); });
-
-  $("reco-toggle").addEventListener("click", function () { recoOpen = !recoOpen; render(); });
-
-  $("b-recap").addEventListener("click", function () {
-    var r = $("recap");
-    if (!r.hidden) { r.hidden = true; return; }
-    var cost = EXP.toNext[S.level];
-    var hours = S.rate > 0 ? (cost - S.expInto) / S.rate : Infinity;
-    var net = S.mesoEarned - S.mesoSpent;
-    var top = S.monsters.slice().sort(function (a, b2) { return b2.c - a.c; })[0];
-    r.innerHTML = "<b>" + dur(S.playedSec) + "</b> played" +
-      (top ? ", mostly <b>" + top.n + "</b>" : "") +
-      ". <b>" + n(S.expGained) + "</b> EXP at <b>" + n(S.rate) + "</b>/hr, " +
-      "<b>" + n(S.kills) + "</b> kills. Mesos <b>" + n(S.mesoEarned) + "</b> in, " +
-      "<b>" + n(S.mesoSpent) + "</b> on potions, net <b>" + (net >= 0 ? "+" : "−") + n(Math.abs(net)) + "</b>. " +
-      "Level " + (S.level + 1) + " in <b>" + hhmm(hours) + "</b>.";
-    r.hidden = false;
+  /* ---- dark or light --------------------------------------------------
+     Dark is the default because this panel sits over a game. Light is for
+     reading the week back afterwards. The choice is per-machine, so it
+     lives in localStorage rather than in the session file — and a browser
+     that refuses storage must still get a working panel, hence the
+     try/catch on both ends. */
+  var THEME_KEY = "expcalc.theme";
+  function setTheme(name) {
+    document.documentElement.dataset.theme = name;
+    try { localStorage.setItem(THEME_KEY, name); } catch (e) {}
+    // The region tint is written as inline custom properties on <html>,
+    // which would otherwise sit on top of the new theme and be read back
+    // as if they were its base colours. Clear them, re-read, re-tint.
+    var root = document.documentElement.style;
+    THEME.TOKENS.forEach(function (k) { root.removeProperty(k); });
+    var hue = shownHue;
+    BASE = null; shownHue = null;
+    readBaseTheme();
+    if (hue !== null) applyRegionHue(hue);
+  }
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+    if (saved === "light") document.documentElement.dataset.theme = "light";
+  })();
+  var bCfg = $("b-cfg");
+  if (bCfg) bCfg.addEventListener("click", function () {
+    setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
   });
 
   // The X hides to the tray; it does not quit. Tracking keeps running while

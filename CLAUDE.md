@@ -129,6 +129,7 @@ seconds of frames; and `ocr::locate` sweeps the cheap bottom-fifth band for
 | `src/notes.rs` | file logging; a release build has no console, so `note!` is the only way to see anything |
 | `ui/overlay.html` | the panel |
 | `ui/theme.js` | region hue rotation — **only hue moves**, so contrast can't drift |
+| `ui/tokens.css` | the palette, dark and light; no component rule may hardcode a colour |
 | `ui/mapdata.js` | map recommendations (hysteresis + throttle; it used to flicker) |
 | `assets/profile.json` | everything taught: atlas, thresholds, band geometry, per-reader `enabled` |
 
@@ -213,9 +214,46 @@ in the panel, kill counting switched on.
 
 Two numbers are promoted above everything else — time to the next level and
 EXP per hour — because those are what somebody reads mid-fight, without
-stopping. Everything else on the panel is read deliberately, in town. Keep
-that hierarchy: if a third thing becomes "important", it goes in the grid,
-not the hero.
+stopping. Keep that hierarchy: if a third thing becomes "important", it goes
+in the grid, not the hero.
+
+Below them there are **four** figures and only four: played, monsters
+killed, mesos picked up, mesos from sales. The panel used to carry twelve,
+including DPS, deaths, party bonus, EXP per kill and kills to level, plus
+roll-ups for today / month / all time. They went because the person using
+this asked for them to go: "simple is better", and "I don't want to know
+more than the next level". Resist refilling that grid.
+
+The recommendation card stays — it was removed once by mistake and asked
+for back. It carries the only outbound link in the app, to the MeowDB map
+database, because that card is the one place a link means anything: the
+panel has just said a map is worth the trip.
+
+Opening that link goes through `open_map_database`, a command that takes
+**no URL**. A command that opens whatever address the page hands it is a
+command that opens whatever address anything reaching the page hands it,
+and this webview renders text read off the game screen. If a second link is
+ever needed, add a second no-argument command, not a parameter.
+
+### Colour
+
+Two themes in `ui/tokens.css` — dark by default because the panel sits over
+a game, light for reading the week back afterwards; the header's gear
+switches them and the choice is kept in `localStorage`. They share an
+identity rather than inverting: phthalo green and jade are structure in
+both, and only the accent changes, antique gold on obsidian in dark and
+phthalo green on ivory in light.
+
+That last part is a deliberate departure from the palette as specified,
+which lists Champagne as the light-mode accent. Champagne on ivory is about
+1.5:1 — fine for a fill, unreadable for the hero figure, which is the one
+thing on this panel that has to be legible across a desk. So champagne
+fills and green writes. The 60/30/10 split holds either way.
+
+**No component rule may hardcode a colour.** Light mode broke the first
+time precisely because `.panel` and six other rules carried a literal dark
+`rgba()` that no theme could reach. If a new surface needs a shade that is
+not in the tokens, add the token.
 
 Under the figures, `review` (one Tauri command, `History::review`) returns
 seven day buckets for the current week plus the previous session, so the

@@ -16,8 +16,8 @@
 .stage-note {
   position: absolute; left: 16px; bottom: 14px; z-index: 3;
   font-size: var(--fs-micro);
-  color: rgba(244, 241, 232, 0.72);
-  background: rgba(13, 27, 21, 0.72);
+  color: var(--c-text-muted);
+  background: var(--c-well);
   border: 1px solid var(--c-border);
   border-radius: var(--r-pill);
   padding: var(--s-2) var(--s-4);
@@ -40,7 +40,7 @@
   width: 418px;
   max-height: calc(100% - 36px);
   display: flex; flex-direction: column;
-  background: rgba(20, 38, 29, 0.93);
+  background: var(--c-panel);
   border: 1px solid var(--c-border-strong);
   border-radius: var(--r-lg);
   box-shadow: var(--sh-pop);
@@ -60,14 +60,14 @@
    it is a control; on an overlay with a 1px border and rounded corners it
    reads as a grey border stuck to one side of the panel. Thin and tinted to
    the accent so it stays a scrollbar. */
-.panel { scrollbar-width: thin; scrollbar-color: rgba(169, 206, 97, 0.30) transparent; }
+.panel { scrollbar-width: thin; scrollbar-color: var(--c-accent-line) transparent; }
 .panel::-webkit-scrollbar { width: 6px; }
 .panel::-webkit-scrollbar-track { background: transparent; }
 .panel::-webkit-scrollbar-thumb {
-  background: rgba(169, 206, 97, 0.30);
+  background: var(--c-accent-line);
   border-radius: var(--r-pill);
 }
-.panel::-webkit-scrollbar-thumb:hover { background: rgba(169, 206, 97, 0.50); }
+.panel::-webkit-scrollbar-thumb:hover { background: var(--c-border-strong); }
 
 .p-head {
   display: flex; align-items: center; gap: var(--s-2);
@@ -75,7 +75,7 @@
   border-bottom: 1px solid var(--c-divider);
   flex: none;
   position: sticky; top: 0; z-index: 3;
-  background: rgba(20, 38, 29, 0.97);
+  background: var(--c-panel-solid);
 }
 .p-head .leaf { width: 17px; height: 17px; color: var(--c-accent); }
 .p-head .nm { font-weight: var(--fw-semi); font-size: var(--fs-small); letter-spacing: var(--ls-tight); }
@@ -134,7 +134,7 @@
 }
 .mini-track {
   position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
-  background: rgba(13, 27, 21, 0.75);
+  background: var(--c-well);
 }
 .mini-track > i { display: block; height: 100%; background: var(--c-accent); }
 
@@ -143,7 +143,7 @@
 .reco {
   margin: 0 var(--s-4) var(--s-3);
   padding: var(--s-3) var(--s-4);
-  background: rgba(13, 27, 21, 0.5);
+  background: var(--c-well);
   border: 1px solid var(--c-border);
   border-left: 2px solid var(--c-info);
   border-radius: var(--r-sm);
@@ -217,16 +217,6 @@
 .btn-s:hover { border-color: var(--c-accent-line); color: var(--c-accent-text); }
 
 /* ranges */
-.ranges { display: flex; gap: var(--s-1); padding: 0 var(--s-4); flex-wrap: wrap; flex: none; }
-.range {
-  background: transparent; border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  padding: var(--s-1) var(--s-3);
-  font-size: var(--fs-micro); font-weight: var(--fw-medium);
-  color: var(--c-text-dim); cursor: pointer;
-}
-.range:hover { color: var(--c-text); }
-.range[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }
 
 .since {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -247,7 +237,7 @@
   padding: var(--s-4);
   border: 1px solid var(--c-accent-line);
   border-radius: var(--r-md);
-  background: linear-gradient(155deg, rgba(169, 206, 97, 0.11), rgba(169, 206, 97, 0.02));
+  background: linear-gradient(155deg, var(--c-accent-soft), var(--c-accent-softer));
   flex: none;
 }
 .hero .t {
@@ -259,7 +249,7 @@
 .hero .u { font-size: var(--fs-small); color: var(--c-text-muted); margin-top: 2px; }
 .hero .bar {
   height: 6px; margin-top: var(--s-3);
-  background: rgba(13, 27, 21, 0.8);
+  background: var(--c-well);
   border-radius: var(--r-pill); overflow: hidden;
 }
 .hero .bar > i {
@@ -274,13 +264,13 @@
 }
 
 /* stat grid */
-.grid3 {
-  display: grid; grid-template-columns: repeat(3, 1fr);
+.grid2 {
+  display: grid; grid-template-columns: repeat(2, 1fr);
   gap: var(--s-2); padding: 0 var(--s-4) var(--s-3);
   flex: none;
 }
 .cell {
-  background: rgba(13, 27, 21, 0.55);
+  background: var(--c-well);
   border: 1px solid var(--c-border);
   border-radius: var(--r-sm);
   padding: var(--s-3);
@@ -315,19 +305,6 @@
 .tab b { color: var(--c-text-faint); font-weight: var(--fw-regular); margin-left: 3px; }
 .tab[aria-selected="true"] b { color: var(--c-accent); }
 
-.search { padding: var(--s-3) var(--s-4); flex: none; }
-.search input {
-  width: 100%;
-  background: rgba(13, 27, 21, 0.7);
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-sm);
-  color: var(--c-text);
-  padding: var(--s-2) var(--s-3);
-  font-size: var(--fs-small);
-}
-.search input::placeholder { color: var(--c-text-faint); }
-.search input:focus-visible { border-color: var(--c-accent); }
-
 .list { padding: 0 var(--s-4) var(--s-3); flex: none; }
 .li {
   display: grid; grid-template-columns: 1fr auto auto;
@@ -340,7 +317,7 @@
 .li .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .li .ct { font-variant-numeric: tabular-nums; color: var(--c-text); font-weight: var(--fw-medium); }
 .li .sh { font-variant-numeric: tabular-nums; color: var(--c-text-dim); font-size: var(--fs-micro); width: 36px; text-align: right; }
-.li .meter { grid-column: 1 / -1; height: 3px; background: rgba(13,27,21,0.8); border-radius: var(--r-pill); overflow: hidden; }
+.li .meter { grid-column: 1 / -1; height: 3px; background: var(--c-well); border-radius: var(--r-pill); overflow: hidden; }
 .li .meter > i { display: block; height: 100%; background: var(--c-accent-deep); }
 .empty { color: var(--c-text-dim); font-size: var(--fs-small); padding: var(--s-5) 0; line-height: var(--lh-snug); }
 
@@ -351,13 +328,13 @@
   border-top: 1px solid var(--c-divider);
   flex: none;
   position: sticky; bottom: 0; z-index: 3;
-  background: rgba(20, 38, 29, 0.97);
+  background: var(--c-panel-solid);
   margin-top: auto;
 }
 .hotkey {
   flex: 1;
   display: flex; align-items: center; gap: var(--s-2);
-  background: rgba(13, 27, 21, 0.6);
+  background: var(--c-well);
   border: 1px solid var(--c-border);
   border-radius: var(--r-sm);
   padding: var(--s-2) var(--s-3);
@@ -370,13 +347,6 @@
   border-radius: var(--r-xs);
   padding: 1px 5px; color: var(--c-text-muted);
 }
-.btn-recap {
-  background: var(--c-accent); border: 1px solid var(--c-accent);
-  color: #0D1B15; font-weight: var(--fw-semi); font-size: var(--fs-small);
-  border-radius: var(--r-sm); padding: var(--s-2) var(--s-5);
-  cursor: pointer; display: inline-flex; align-items: center; gap: var(--s-2);
-}
-.btn-recap:hover { background: var(--c-accent-text); }
 /* Quiet by default — it is the one control that throws the session away, so it
    should not compete with Recap for the eye. It only turns warm once armed. */
 .btn-quit {
@@ -387,8 +357,8 @@
 }
 .btn-quit:hover { color: var(--c-text); border-color: var(--c-text-dim); }
 .btn-quit[data-armed="1"] {
-  background: rgba(196, 92, 72, 0.18);
-  border-color: #C45C48; color: #E8A79A;
+  background: var(--c-alert-soft);
+  border-color: var(--c-alert); color: var(--c-alert-text);
 }
 .icon-s {
   width: 32px; height: 32px; flex: none;
@@ -397,21 +367,6 @@
   border-radius: var(--r-sm); color: var(--c-text-dim); cursor: pointer;
 }
 .icon-s:hover { border-color: var(--c-accent-line); color: var(--c-accent); }
-
-.recap {
-  margin: 0 var(--s-4) var(--s-3);
-  padding: var(--s-3) var(--s-4);
-  border: 1px solid var(--c-border);
-  border-left: 2px solid var(--c-accent);
-  border-radius: var(--r-sm);
-  background: rgba(13, 27, 21, 0.6);
-  font-size: var(--fs-small);
-  color: var(--c-text-muted);
-  line-height: var(--lh-snug);
-  flex: none;
-}
-.recap b { color: var(--c-text); font-variant-numeric: tabular-nums; }
-.recap[hidden] { display: none; }
 
 /* A one-line nudge, not a warning: the overlay works perfectly well
    without it, and only the colour is on offer. */
@@ -451,7 +406,7 @@
   padding: var(--s-3) var(--s-4);
   border: 1px solid var(--c-border);
   border-radius: var(--r-sm);
-  background: rgba(13, 27, 21, 0.4);
+  background: var(--c-well);
   flex: none;
 }
 .week[hidden] { display: none; }
@@ -481,7 +436,7 @@
 .wd > i {
   display: block; width: 100%;
   border-radius: 2px 2px 0 0;
-  background: var(--c-accent-deep);
+  background: var(--c-secondary);
 }
 .wd.now > i { background: var(--c-accent); }
 /* A rest day keeps its column and loses its colour: the gap is the point. */
@@ -497,3 +452,21 @@
   font-size: var(--fs-micro); color: var(--c-text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* The link out to the map database. Sits on the recommendation card
+   because that is the only place it means anything: the panel has just
+   said a map is worth the trip, and this is where you find out how to get
+   there and what lives on it. */
+.reco-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--s-3);
+  background: transparent;
+  border: 1px solid var(--c-accent-line);
+  border-radius: var(--r-pill);
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--fs-micro); font-weight: var(--fw-medium);
+  font-family: inherit;
+  color: var(--c-accent-text);
+  cursor: pointer;
+}
+.reco-cta:hover { border-color: var(--c-accent); background: var(--c-accent-softer); }
