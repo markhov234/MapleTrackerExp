@@ -52,7 +52,7 @@ const CHECKPOINT_EVERY: Duration = Duration::from_secs(30);
 /// The event the overlay listens for.
 pub const EVENT: &str = "session";
 
-struct Tracker {
+struct Reader {
     app: AppHandle,
     profile: Arc<Profile>,
     table: Vec<u64>,
@@ -92,15 +92,10 @@ struct Tracker {
     /// The frame size last seen, so a resized window starts looking again
     /// instead of reading where the bar used to be.
     last_size: (u32, u32),
-    /// When this capture began, so a window that never shows a status bar
-    /// is eventually abandoned rather than watched forever.
-    started: Instant,
     /// When the field was last looked for, so a screen without a status bar
     /// does not turn into a search every frame.
     last_search: Instant,
-    last_read: Instant,
     last_checkpoint: Instant,
-    warned_size: bool,
     reads: u64,
     /// Whether the last frame produced a number, so the log records the
     /// moment it stopped and the moment it came back rather than every
@@ -114,12 +109,6 @@ struct Tracker {
     /// The last badge hue written to the log, so a stable region is not
     /// announced every couple of seconds.
     last_hue: Option<f32>,
-    /// The artwork last sent, so it is sent again only when the player
-    /// actually puts something different in a slot.
-    slot_marks: Vec<Vec<u8>>,
-    /// Artwork waiting for the next snapshot to carry it.
-    pending_icons: Option<Vec<crate::session::SlotIcon>>,
-    last_slots: Instant,
 }
 
 /// How long a readout that has been working is given to come back before the
@@ -153,24 +142,12 @@ const GIVE_UP: Duration = Duration::from_secs(4);
 /// hour, so a couple of seconds is far more often than the answer changes.
 const REGION_EVERY: Duration = Duration::from_secs(2);
 
-/// How often the quick slot bar is looked at.
-///
-/// Finding it costs a fraction of a millisecond, but cropping eight icons
-/// and fingerprinting them is not free, and a player changes what is in
-/// those slots a few times an evening.
-const SLOTS_EVERY: Duration = Duration::from_secs(2);
-
-impl Tracker {
-    /// Send a snapshot to the overlay, carrying any new slot artwork.
-    ///
-    /// The artwork rides along with whatever snapshot goes out next rather
-    /// than on every one: it is tens of kilobytes, it changes a handful of
-    /// times an evening, and the panel keeps what it was last given.
-    fn emit(&mut self, mut snap: crate::session::Snapshot) {
-        if let Some(icons) = self.pending_icons.take() {
-            snap.slot_icons = Some(icons);
+impl Reader {
+    /// Send a snapshot to the overlay.
+    fn emit(&mut self, snap: crate::session::Snapshot) {
+        if let Err(e) = self.app.emit(EVENT, snap) {
+            crate::note!("[tracker] emit failed: {e}");
         }
-        let _ = self.app.emit(EVENT, snap);
     }
 
     /// The scalings worth trying for a frame of this size, likeliest first.
@@ -237,19 +214,15 @@ impl Tracker {
     }
 }
 
-impl GraphicsCaptureApiHandler for Tracker {
-    type Flags = (
-        AppHandle,
-        Arc<Profile>,
-        Arc<Mutex<Session>>,
-        Arc<History>,
-        Arc<AtomicBool>,
-    );
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-
-    fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        let (app, profile, session, history, matched) = ctx.flags;
-        Ok(Tracker {
+impl Reader {
+    fn new(
+        app: AppHandle,
+        profile: Arc<Profile>,
+        session: Arc<Mutex<Session>>,
+        history: Arc<History>,
+        matched: Arc<AtomicBool>,
+    ) -> Reader {
+        Reader {
             app,
             profile,
             table: expcurve::to_next(),
@@ -261,38 +234,23 @@ impl GraphicsCaptureApiHandler for Tracker {
             field: None,
             grid: None,
             last_size: (0, 0),
-            started: Instant::now(),
             last_search: Instant::now() - SEARCH_EVERY,
-            last_read: Instant::now() - READ_EVERY,
             last_checkpoint: Instant::now(),
-            warned_size: false,
             reads: 0,
             was_ok: true,
             last_trouble: None,
             last_good: None,
             last_region: Instant::now() - REGION_EVERY,
             last_hue: None,
-            slot_marks: Vec::new(),
-            pending_icons: None,
-            last_slots: Instant::now() - SLOTS_EVERY,
-        })
+        }
     }
 
-    fn on_frame_arrived(
-        &mut self,
-        frame: &mut CapFrame,
-        _control: InternalCaptureControl,
-    ) -> Result<(), Self::Error> {
+    /// Read one frame. Called on the worker thread, never on the capture
+    /// callback: everything in here is tens to hundreds of milliseconds of
+    /// pixel work, and doing it in the callback holds a frame the Windows
+    /// compositor wants back.
+    fn step(&mut self, w: u32, h: u32, px: &[u8]) {
         let now = Instant::now();
-        if now.duration_since(self.last_read) < READ_EVERY {
-            return Ok(());
-        }
-        self.last_read = now;
-
-        let mut scratch: Vec<u8> = Vec::new();
-        let buffer = frame.buffer()?;
-        let (w, h) = (buffer.width(), buffer.height());
-        let px = buffer.as_nopadding_buffer(&mut scratch);
         let view = ocr::Frame { w, h, px };
 
         // A resized window redraws its status bar somewhere else, and may
@@ -305,93 +263,6 @@ impl GraphicsCaptureApiHandler for Tracker {
                 self.grid = None;
             }
             self.last_size = (w, h);
-        }
-
-        // Deciding whether this is really the game window.
-        //
-        // Matching the frame against a size the profile was taught on used
-        // to be the test, because the regions were absolute pixels and a
-        // different size meant they pointed at the wrong place. It was never
-        // a good test of what the window *was*, only a cheap one, and it
-        // failed the common case outright: resize the client and the tracker
-        // stopped seeing the game.
-        //
-        // There is a far better test now. Is there a region shaped like an
-        // EXP readout, and does the number in it divide into the percentage
-        // printed beside it? Size is a coincidence; that is a fact about the
-        // window, and nothing but the game's status bar produces it. So any
-        // size is accepted, and the window that gets dropped is the one that
-        // has not produced a reading within a few seconds.
-        if !self.matched.load(Ordering::Relaxed) && now.duration_since(self.started) > GIVE_UP {
-            if !self.warned_size {
-                self.warned_size = true;
-                crate::note!(
-                    "[tracker] no EXP bar in this {w}x{h} window after {GIVE_UP:?} — trying the next one"
-                );
-            }
-            _control.stop();
-            return Ok(());
-        }
-
-        // Chat first, and regardless of whether the bar reads: a window
-        // over the status bar must not also stop the kill count, and the
-        // log is the only source for kills, mesos and drops.
-        // The quick slot bar: what the player has to hand. The artwork is
-        // lifted off their own screen rather than looked up in a table of
-        // item sprites, so whatever they put in a slot is what the panel
-        // shows, including items this program has never heard of.
-        if let Some(cfg) = self.profile.slots.as_ref().filter(|s| s.enabled) {
-            if now.duration_since(self.last_slots) >= SLOTS_EVERY {
-                self.last_slots = now;
-                let scale = self.grid.unwrap_or_else(|| self.profile.scale(w, h));
-                let (nw, nh) = scale.native(w, h);
-                let plate = crate::unstretch::plate_rgb(&view, scale, 0, nh / 2, nw, nh / 2);
-                if plate.w > 0 && plate.h > 0 {
-                    let pf = plate.frame();
-                    if let Some(panel) = crate::slots::find_panel(&pf, cfg) {
-                        let n = cfg.cols * cfg.rows;
-                        let mut marks: Vec<Vec<u8>> = Vec::with_capacity(n as usize);
-                        let mut icons = Vec::with_capacity(n as usize);
-                        for i in 0..n {
-                            if let Some((iw, ih, px)) =
-                                crate::slots::icon_rgba(&pf, &panel, cfg, i)
-                            {
-                                icons.push(crate::session::SlotIcon {
-                                    slot: i,
-                                    w: iw,
-                                    h: ih,
-                                    rgba: crate::slots::base64(&px),
-                                });
-                                marks.push(px);
-                            }
-                        }
-                        let changed = marks.len() != self.slot_marks.len()
-                            || marks
-                                .iter()
-                                .zip(&self.slot_marks)
-                                .any(|(a, b)| {
-                                    crate::slots::differs(a, b, cfg.slot, cfg.slot, cfg.count_h)
-                                });
-                        if changed {
-                            let worst = marks
-                                .iter()
-                                .zip(&self.slot_marks)
-                                .map(|(a, b)| {
-                                    crate::slots::drift(a, b, cfg.slot, cfg.slot, cfg.count_h)
-                                })
-                                .fold(0f32, f32::max);
-                            crate::note!(
-                                "[tracker] quick slots changed ({} slots, {} known, worst drift {:.3})",
-                                icons.len(),
-                                self.slot_marks.len(),
-                                worst
-                            );
-                            self.slot_marks = marks;
-                            self.pending_icons = Some(icons);
-                        }
-                    }
-                }
-            }
         }
 
         // Which region the player is in, taken from the badge beside the
@@ -468,7 +339,7 @@ impl GraphicsCaptureApiHandler for Tracker {
         if self.profile.atlas.is_empty() {
             let snap = self.session.lock().unwrap().snapshot("profile has no font");
             self.emit(snap);
-            return Ok(());
+            return;
         }
 
         // The level the session already believes it is on turns the
@@ -506,7 +377,7 @@ impl GraphicsCaptureApiHandler for Tracker {
                 .unwrap()
                 .snapshot("looking for the EXP bar\u{2026}");
             self.emit(snap);
-            return Ok(());
+            return;
         };
         // Always set by here: a reading only exists where a region was.
         let roi = self.field.clone().unwrap_or_else(|| self.profile.over("exp", 0, 0));
@@ -540,7 +411,7 @@ impl GraphicsCaptureApiHandler for Tracker {
         if blip {
             let snap = self.session.lock().unwrap().snapshot("tracking");
             self.emit(snap);
-            return Ok(());
+            return;
         }
         let stale = self
             .last_trouble
@@ -596,18 +467,152 @@ impl GraphicsCaptureApiHandler for Tracker {
 
         let snap = self.session.lock().unwrap().snapshot(status);
         self.emit(snap);
-        Ok(())
     }
 
     /// The game window went away — a client exit, a crash, or a channel
     /// change. The session is not over, so it is checkpointed rather than
     /// filed: capture restarts as soon as the window is back and the totals
     /// carry straight on.
-    fn on_closed(&mut self) -> Result<(), Self::Error> {
+    fn closed(&mut self) {
         let rec = self.session.lock().unwrap().record();
         self.history.checkpoint(&rec);
         let snap = self.session.lock().unwrap().snapshot("game window closed");
         self.emit(snap);
+    }
+}
+
+/// One frame, copied out of the compositor's buffer so it can be let go of.
+struct Shot {
+    w: u32,
+    h: u32,
+    px: Vec<u8>,
+}
+
+/// The capture callback, and deliberately nothing else.
+///
+/// Windows Graphics Capture calls `on_frame_arrived` on its own thread while
+/// holding a frame that belongs to the desktop compositor, and it wants it
+/// back. Reading the status bar is tens of milliseconds on a good frame and
+/// a few hundred on a frame that has no status bar in it, because then every
+/// candidate grid gets swept. Spending that in the callback stalls the
+/// compositor's queue, and what the user sees is their whole desktop
+/// hitching for a second or two whenever this program starts up and walks
+/// through candidate windows.
+///
+/// So the callback does the least it can: copy the pixels, hand them to a
+/// worker, return. A frame that arrives while the worker is still busy is
+/// dropped rather than queued — the reader samples twice a second by
+/// design, and a stale frame is worth nothing.
+struct Capture {
+    tx: std::sync::mpsc::SyncSender<Shot>,
+    /// Set by the reader once it has actually read an EXP bar here.
+    matched: Arc<AtomicBool>,
+    started: Instant,
+    last_read: Instant,
+    warned: bool,
+    dropped: u64,
+}
+
+impl GraphicsCaptureApiHandler for Capture {
+    type Flags = (
+        AppHandle,
+        Arc<Profile>,
+        Arc<Mutex<Session>>,
+        Arc<History>,
+        Arc<AtomicBool>,
+    );
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        let (app, profile, session, history, matched) = ctx.flags;
+        // Capacity one: there is never a reason to hold two frames, and a
+        // bounded channel is what makes dropping the policy rather than
+        // growing a queue until memory runs out.
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Shot>(1);
+        let mut reader = Reader::new(app, profile, session, history, Arc::clone(&matched));
+        std::thread::spawn(move || {
+            for shot in rx {
+                reader.step(shot.w, shot.h, &shot.px);
+            }
+            // The channel closed, which means the capture ended: the window
+            // was closed, changed channel, or was the wrong window.
+            reader.closed();
+        });
+        Ok(Capture {
+            tx,
+            matched,
+            started: Instant::now(),
+            last_read: Instant::now() - READ_EVERY,
+            warned: false,
+            dropped: 0,
+        })
+    }
+
+    fn on_frame_arrived(
+        &mut self,
+        frame: &mut CapFrame,
+        control: InternalCaptureControl,
+    ) -> Result<(), Self::Error> {
+        let now = Instant::now();
+
+        // Deciding whether this is really the game window.
+        //
+        // Matching the frame against a size the profile was taught on used
+        // to be the test, because the regions were absolute pixels and a
+        // different size meant they pointed at the wrong place. It was never
+        // a good test of what the window *was*, only a cheap one, and it
+        // failed the common case outright: resize the client and the tracker
+        // stopped seeing the game.
+        //
+        // There is a far better test now. Is there a region shaped like an
+        // EXP readout, and does the number in it divide into the percentage
+        // printed beside it? Size is a coincidence; that is a fact about the
+        // window, and nothing but the game's status bar produces it. So any
+        // size is accepted, and the window that gets dropped is the one that
+        // has not produced a reading within a few seconds.
+        if !self.matched.load(Ordering::Relaxed) && now.duration_since(self.started) > GIVE_UP {
+            if !self.warned {
+                self.warned = true;
+                crate::note!(
+                    "[tracker] no EXP bar in this window after {GIVE_UP:?} — trying the next one"
+                );
+            }
+            control.stop();
+            return Ok(());
+        }
+
+        if now.duration_since(self.last_read) < READ_EVERY {
+            return Ok(());
+        }
+        // Claim the slot before the copy, not after. Otherwise a worker that
+        // is still busy makes every single frame pay for a full-frame memcpy
+        // just to be refused.
+        self.last_read = now;
+
+        let mut scratch: Vec<u8> = Vec::new();
+        let buffer = frame.buffer()?;
+        let (w, h) = (buffer.width(), buffer.height());
+        let px = buffer.as_nopadding_buffer(&mut scratch);
+        match self.tx.try_send(Shot { w, h, px: px.to_vec() }) {
+            Ok(()) => {}
+            Err(std::sync::mpsc::TrySendError::Full(_)) => {
+                self.dropped += 1;
+                if self.dropped % 40 == 1 {
+                    crate::note!(
+                        "[tracker] reader is behind; {} frame(s) dropped so far",
+                        self.dropped
+                    );
+                }
+            }
+            // The worker is gone, so there is nothing to capture for.
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => control.stop(),
+        }
+        Ok(())
+    }
+
+    /// Nothing to do here: dropping the sender ends the worker's loop, and
+    /// the worker checkpoints the session itself.
+    fn on_closed(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -646,9 +651,29 @@ fn candidate_windows() -> Vec<(u32, Window, String)> {
                     .position(|p| lower.contains(&p.to_ascii_lowercase()))
                     .map(|i| 100 + i as u32)
             });
-        if let Some(rank) = rank {
-            ranked.push((rank, w, title));
+        let Some(rank) = rank else { continue };
+        // Too small to be a game client, so not worth a capture session.
+        //
+        // Every candidate costs a D3D11 device, a capture session, and up
+        // to GIVE_UP seconds of frames before it is abandoned. Starting and
+        // tearing those down in a row is itself work the compositor feels,
+        // and a browser tab or a chat window named after the game can never
+        // pass the EXP-bar test anyway. This is a cheap pre-filter, not the
+        // identification: that is still the arithmetic.
+        let size = w.width().ok().zip(w.height().ok());
+        match size {
+            Some((cw, ch)) if cw >= 640 && ch >= 480 => {}
+            Some((cw, ch)) => {
+                crate::note!("[tracker] skipping {title:?}: {cw}x{ch} is too small to be the client");
+                continue;
+            }
+            // A window whose size cannot be read is almost certainly
+            // minimised or gone. Let it through: being wrong here only
+            // costs one abandoned capture, and refusing a real client
+            // would be worse.
+            None => {}
         }
+        ranked.push((rank, w, title));
     }
     ranked.sort_by_key(|(r, ..)| *r);
     for (r, _, t) in &ranked {
@@ -717,7 +742,7 @@ pub fn spawn(app: AppHandle, profile: Profile, history: Arc<History>) -> Arc<Mut
                         Arc::clone(&matched),
                     ),
                 );
-                if let Err(e) = Tracker::start(settings) {
+                if let Err(e) = Capture::start(settings) {
                     crate::note!("[tracker] capture of {title:?} ended: {e}");
                 }
                 if matched.load(Ordering::Relaxed) {

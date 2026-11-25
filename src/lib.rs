@@ -11,6 +11,5 @@ pub mod notes;
 pub mod ocr;
 pub mod region;
 pub mod session;
-pub mod slots;
 pub mod tracker;
 pub mod unstretch;

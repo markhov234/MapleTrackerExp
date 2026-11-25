@@ -53,7 +53,7 @@ pub struct Record {
 
 impl Record {
     /// Levels gained, when both ends are known.
-    fn levels(&self) -> usize {
+    pub fn levels(&self) -> usize {
         match (self.level_start, self.level_end) {
             (Some(a), Some(b)) if b > a => b - a,
             _ => 0,
@@ -123,6 +123,40 @@ impl Range {
             Range::Session | Range::All => 0,
         }
     }
+}
+
+/// One day of the week being reviewed.
+///
+/// A day with nothing in it is still in the list. A week where Tuesday is
+/// missing and a week where Tuesday was a rest day look the same in a list
+/// that only holds days you played, and they are not the same thing.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Day {
+    /// `Mon 24`, for a column label.
+    pub label: String,
+    pub exp: u64,
+    pub active_secs: u64,
+    pub kills: u64,
+    pub mesos: u64,
+    pub levels: usize,
+    pub sessions: usize,
+    /// EXP per hour across that day's active time.
+    pub rate: f64,
+    pub today: bool,
+}
+
+/// The week in review, plus the session before this one.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct Review {
+    /// The most recently finished session — not the live one. What the
+    /// player means by "last time".
+    pub last: Option<Record>,
+    pub week: Totals,
+    /// Monday through Sunday of the current week, always seven entries.
+    pub days: Vec<Day>,
+    /// The best single day's EXP this week, so the panel can scale its bars
+    /// without a second pass.
+    pub best_exp: u64,
 }
 
 /// An added-up span, ready for the panel.
@@ -225,6 +259,70 @@ impl History {
         self.append(rec);
         self.done.lock().unwrap().push(rec.clone());
         let _ = fs::remove_file(self.path(CURRENT));
+    }
+
+    /// The week in review: seven day buckets, the week's totals, and the
+    /// session before the live one.
+    ///
+    /// The live session is folded into the day buckets and the totals so the
+    /// panel does not show a figure that lags until you quit, but it is
+    /// deliberately *not* what `last` returns: "last session" means the one
+    /// before this, and showing the current one there would be confusing at
+    /// exactly the moment a player looks.
+    pub fn review(&self, current: Option<&Record>, now: i64) -> Review {
+        let monday = Range::Week.since(now);
+        let done = self.done.lock().unwrap();
+
+        // Seven buckets, Monday first, each labelled from its own local date
+        // so a week spanning a month boundary reads correctly.
+        let mut days: Vec<Day> = Vec::with_capacity(7);
+        let mut bounds: Vec<(i64, i64)> = Vec::with_capacity(7);
+        for i in 0..7 {
+            let start = monday + i * 86_400;
+            let end = start + 86_400;
+            let label = Local
+                .timestamp_opt(start, 0)
+                .single()
+                .map(|t| t.format("%a %-d").to_string())
+                .unwrap_or_default();
+            days.push(Day {
+                label,
+                today: now >= start && now < end,
+                ..Default::default()
+            });
+            bounds.push((start, end));
+        }
+
+        let fold = |days: &mut Vec<Day>, r: &Record| {
+            let Some(i) = bounds.iter().position(|(a, b)| r.started >= *a && r.started < *b) else {
+                return;
+            };
+            let d = &mut days[i];
+            d.exp += r.exp_gained;
+            d.active_secs += r.active_secs;
+            d.kills += r.kills;
+            d.mesos += r.mesos;
+            d.levels += r.levels();
+            d.sessions += 1;
+        };
+        for r in done.iter() {
+            fold(&mut days, r);
+        }
+        if let Some(r) = current {
+            fold(&mut days, r);
+        }
+        for d in days.iter_mut() {
+            if d.active_secs > 0 {
+                d.rate = d.exp as f64 / d.active_secs as f64 * 3600.0;
+            }
+        }
+
+        let best_exp = days.iter().map(|d| d.exp).max().unwrap_or(0);
+        // Worth having on disk is worth showing: a checkpoint with nothing
+        // in it is filtered at `finish`, so the last entry here is real.
+        let last = done.last().cloned();
+        drop(done);
+        Review { last, week: self.totals(Range::Week, current, now), days, best_exp }
     }
 
     /// Add up a range. `current` is the live session, which is not on disk yet
@@ -365,4 +463,50 @@ mod tests {
         h.finish(&rec(now - 60, 0, 0));
         assert_eq!(h.totals(Range::All, None, now).sessions, 0);
     }
+
+    /// Seven buckets whatever happened, because a week with a gap and a week
+    /// that was never recorded must not look the same.
+    #[test]
+    fn the_week_always_has_seven_days() {
+        let h = History::open(temp_dir("week7"));
+        let now = Local::now().timestamp();
+        let r = h.review(None, now);
+        assert_eq!(r.days.len(), 7);
+        assert_eq!(r.days.iter().filter(|d| d.today).count(), 1, "exactly one day is today");
+        assert!(r.days.iter().all(|d| !d.label.is_empty()), "every day is labelled");
+    }
+
+    /// The live session belongs in today's bucket, and is not what "last
+    /// session" means.
+    #[test]
+    fn today_holds_the_live_session_but_last_is_the_one_before() {
+        let h = History::open(temp_dir("weeklive"));
+        let now = Local::now().timestamp();
+        h.finish(&rec(now - 3600, 20_000, 1800));
+        let live = rec(now - 300, 5_000, 300);
+
+        let r = h.review(Some(&live), now);
+        let today = r.days.iter().find(|d| d.today).expect("today is in the week");
+        assert_eq!(today.exp, 25_000, "both the filed and the live session");
+        assert_eq!(today.sessions, 2);
+        assert_eq!(r.week.exp, 25_000);
+        assert_eq!(
+            r.last.as_ref().map(|l| l.exp_gained),
+            Some(20_000),
+            "last session is the filed one, not the live one"
+        );
+    }
+
+    /// Rate is per day, over that day's own active time — not the week's.
+    #[test]
+    fn each_day_rates_itself() {
+        let h = History::open(temp_dir("weekrate"));
+        let now = Local::now().timestamp();
+        h.finish(&rec(now - 1800, 60_000, 1800));
+        let r = h.review(None, now);
+        let today = r.days.iter().find(|d| d.today).expect("today");
+        assert!((today.rate - 120_000.0).abs() < 1.0, "rate was {}", today.rate);
+        assert_eq!(r.best_exp, 60_000);
+    }
+
 }

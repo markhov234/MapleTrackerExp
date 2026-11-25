@@ -66,11 +66,6 @@ path = "src/bin/harvest.rs"
 required-features = ["tools"]
 
 [[bin]]
-name = "slots-atlas"
-path = "src/bin/slots-atlas.rs"
-required-features = ["tools"]
-
-[[bin]]
 name = "notice-atlas"
 path = "src/bin/notice-atlas.rs"
 required-features = ["tools"]

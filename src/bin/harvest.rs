@@ -14,7 +14,6 @@
 //! different backgrounds.
 //!
 //!   harvest notices [seconds] [--every MS] [--max N]
-//!   harvest slots   [seconds] [--every MS] [--max N]
 //!
 //! Frames land in `captures/harvest/`.
 //!
@@ -26,7 +25,7 @@ use std::time::{Duration, Instant};
 
 use maple_tracker::expcurve;
 use maple_tracker::ocr::{self, Profile};
-use maple_tracker::{slots, unstretch};
+use maple_tracker::unstretch;
 use windows_capture::capture::{Context, GraphicsCaptureApiHandler};
 use windows_capture::frame::Frame as CapFrame;
 use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -39,12 +38,6 @@ use windows_capture::window::Window;
 const PROFILE_JSON: &str = include_str!("../../assets/profile.json");
 const DIR: &str = "captures/harvest";
 
-#[derive(Clone, Copy, PartialEq)]
-enum What {
-    Notices,
-    Slots,
-}
-
 struct Shot {
     w: u32,
     h: u32,
@@ -54,7 +47,6 @@ struct Shot {
 struct Harvester {
     profile: Profile,
     table: Vec<u64>,
-    what: What,
     tx: Sender<Shot>,
     start: Instant,
     last: Instant,
@@ -102,16 +94,15 @@ fn moved(a: &[u8], b: &[u8]) -> bool {
 }
 
 impl GraphicsCaptureApiHandler for Harvester {
-    type Flags = (Profile, What, Sender<Shot>, Duration, Duration, usize);
+    type Flags = (Profile, Sender<Shot>, Duration, Duration, usize);
     type Error = Box<dyn std::error::Error + Send + Sync>;
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        let (profile, what, tx, every, until, max) = ctx.flags;
+        let (profile, tx, every, until, max) = ctx.flags;
         let now = Instant::now();
         Ok(Harvester {
             profile,
             table: expcurve::to_next(),
-            what,
             tx,
             start: now,
             last: now - every,
@@ -160,26 +151,9 @@ impl GraphicsCaptureApiHandler for Harvester {
 
         // Cut the band this run is interested in, and ask whether it has
         // anything new in it.
-        let band = match self.what {
-            What::Notices => {
-                let Some(cfg) = self.profile.notices.as_ref() else { return Ok(()) };
-                let r = cfg.band(nw, nh);
-                unstretch::plate_with(&view, scale, r.x, r.y, r.w, r.h, unstretch::warm)
-            }
-            What::Slots => {
-                let plate = unstretch::plate_rgb(&view, scale, 0, nh / 2, nw, nh / 2);
-                let Some(cfg) = self.profile.slots.as_ref() else { return Ok(()) };
-                let Some(p) = slots::find_panel(&plate.frame(), cfg) else { return Ok(()) };
-                unstretch::plate_rgb(
-                    &view,
-                    scale,
-                    p.x,
-                    p.y + nh / 2,
-                    p.w,
-                    p.h,
-                )
-            }
-        };
+        let Some(cfg) = self.profile.notices.as_ref() else { return Ok(()) };
+        let r = cfg.band(nw, nh);
+        let band = unstretch::plate_with(&view, scale, r.x, r.y, r.w, r.h, unstretch::warm);
         if band.w == 0 || band.h == 0 {
             return Ok(());
         }
@@ -209,14 +183,10 @@ impl GraphicsCaptureApiHandler for Harvester {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let what = match args.first().map(|s| s.as_str()) {
-        Some("notices") => What::Notices,
-        Some("slots") => What::Slots,
-        _ => {
-            eprintln!("usage: harvest <notices|slots> [seconds] [--every MS] [--max N]");
-            std::process::exit(2);
-        }
-    };
+    if args.first().map(|s| s.as_str()) != Some("notices") {
+        eprintln!("usage: harvest notices [seconds] [--every MS] [--max N]");
+        std::process::exit(2);
+    }
     let value = |name: &str| {
         args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)?.parse::<u64>().ok())
     };
@@ -279,7 +249,7 @@ fn main() {
         MinimumUpdateIntervalSettings::Default,
         DirtyRegionSettings::Default,
         ColorFormat::Rgba8,
-        (profile, what, tx, every, Duration::from_secs(secs), max),
+        (profile, tx, every, Duration::from_secs(secs), max),
     );
     if let Err(e) = Harvester::start(settings) {
         eprintln!("capture ended: {e}");

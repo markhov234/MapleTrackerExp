@@ -92,6 +92,28 @@ shouldn't destroy the first. `exp_per_kill` divides by `kills_valued` so
 unpriced kills don't drag the average down. See the module docs in
 `src/chat.rs`.
 
+### 4. The capture callback does almost nothing
+
+Windows Graphics Capture calls `on_frame_arrived` on its own thread while
+holding a frame the desktop compositor wants back. Reading the status bar is
+tens of milliseconds on a good frame and a few hundred on one with no status
+bar in it, because then every candidate grid gets swept. Doing that in the
+callback stalls the compositor's queue, and what the user sees is **their
+whole desktop hitching** for a second or two whenever the app starts and
+walks through candidate windows. That was a real, reported bug.
+
+So `Capture` copies the pixels, hands them to a worker over a channel of
+capacity **one**, and returns. `Reader` does everything else on its own
+thread. A frame that arrives while the reader is busy is dropped, which is
+correct: the reader samples twice a second by design and a stale frame is
+worth nothing. Do not move analysis back into the callback, and do not grow
+that channel — a queue there just converts a stall into latency plus memory.
+
+Two supporting cuts: `candidate_windows` skips anything smaller than
+640x480, because every candidate costs a D3D11 device and up to `GIVE_UP`
+seconds of frames; and `ocr::locate` sweeps the cheap bottom-fifth band for
+*every* grid before any full-frame band for *any* grid.
+
 ## Layout
 
 | File | What it holds |
@@ -99,11 +121,10 @@ unpriced kills don't drag the average down. See the module docs in
 | `src/unstretch.rs` | the grid, scales, plates |
 | `src/ocr.rs` | `Profile`, glyph cutting and classification, `locate()`, `read_rows()` |
 | `src/chat.rs` | turning OCR'd lines into events and tallies (`classify`, `Log`, `Tally`) |
-| `src/tracker.rs` | the capture loop; one native path, all readers driven from here |
+| `src/tracker.rs` | `Capture` (the callback) and `Reader` (the analysis), on two threads |
 | `src/session.rs` | live state and `Snapshot`, the single struct the UI receives |
-| `src/history.rs` | `sessions.jsonl` + `current.json` checkpointing |
+| `src/history.rs` | `sessions.jsonl` + `current.json`, range totals, and the weekly `review` |
 | `src/region.rs` | minimap badge -> region hue |
-| `src/slots.rs` | quick slot bar: find the panel, cut icons, mask counts |
 | `src/expcurve.rs` | EXP-to-next-level table |
 | `src/notes.rs` | file logging; a release build has no console, so `note!` is the only way to see anything |
 | `ui/overlay.html` | the panel |
@@ -141,7 +162,7 @@ them: `cargo run --features tools --bin <name>`.
 - `list-windows`, `find-character`, `capture-spike`, `read-stats`, `sample-exp`
 - `native-atlas` — teach the status-bar font
 - `notice-atlas` — teach the floating EXP/meso lines (`show`, `teach --at Y H --text "..."`, `read`, `events`)
-- `minimap-atlas`, `slots-atlas` — region badge and quick slots
+- `minimap-atlas` — the region badge
 - `harvest` — **watches the live game and saves only frames where the watched
   band changed** (`harvest notices 600`, `harvest slots 600`). Built because
   teaching needs frames with real text in them, and asking the player to pose
@@ -168,21 +189,45 @@ in the panel, kill counting switched on.
      kill rule requires the literal word `received` rather than merely the
      absence of `bonus`/`party` — otherwise a party bonus double-counts every
      monster. Don't loosen that rule before teaching those letters.
-2. **Potions used (HP and MP).** The original ask, still not done. The slot
-   icons are read and displayed; the **counts** are not. They are white digits
-   with a 1px black outline, ~4x8 native px, sitting over both a white panel
-   background and coloured icons — the outline is the discriminator, *not* the
-   blue channel (the background is white too; that assumption cost a cycle).
-   Potions-used = count decreasing. Telling HP from MP is best done by
-   watching which bar jumps when a count drops, which needs HP/MP reading
-   restored — it was lost when `rois` and the `H`/`M`/`P`/`/` glyphs were
-   dropped in the unstretch rewrite.
+2. **Potions used (HP and MP).** Not done, and the route to it changed.
+   There *was* a quick-slot reader that found the slot panel and cut the
+   eight icons out of it; it was removed at the user's request, because the
+   icons took panel space and the counts — the part that would actually
+   answer "how many potions did I drink" — were never read. If this is
+   picked up again, `git log` has the whole module. What was learned and is
+   worth not relearning: the counts are white digits with a 1px black
+   outline, about 4x8 native px, drawn over both a white panel background
+   and coloured icons, so the **outline** is the discriminator and the blue
+   channel is not (the background is white too; that assumption cost a
+   cycle). Telling HP from MP means watching which bar jumps when a count
+   drops, which needs HP/MP reading restored — lost when `rois` and the
+   `H`/`M`/`P`/`/` glyphs were dropped in the unstretch rewrite.
 3. **Monster kill attribution and images.** The Monsters tab has no data path
    at all — `S.monsters` is never populated from any snapshot field. The
    floating lines never name the monster, so identity needs a nametag reader.
    Images cannot be cropped from the screen; see "Prior art".
 4. Smaller: mesos spent isn't readable (could be estimated), the Inter font
    isn't bundled, map data stops at level 60.
+
+### The panel
+
+Two numbers are promoted above everything else — time to the next level and
+EXP per hour — because those are what somebody reads mid-fight, without
+stopping. Everything else on the panel is read deliberately, in town. Keep
+that hierarchy: if a third thing becomes "important", it goes in the grid,
+not the hero.
+
+Under the figures, `review` (one Tauri command, `History::review`) returns
+seven day buckets for the current week plus the previous session, so the
+panel can answer "is tonight better than last night". The live session folds
+into the buckets and the week total, but deliberately **not** into `last`:
+"last session" means the one before this one. A day with nothing in it keeps
+its column — a rest day and a day that was never recorded are different
+things, and a chart that drops empty days hides that.
+
+Nothing in `ui/` may be a screenshot of a real game session. `demo-bg.jpg`
+was one, and it carried the player's character name, their meso balance and
+a dozen other players' names into a public repository.
 
 ## Prior art
 

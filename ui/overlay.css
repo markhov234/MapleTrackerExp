@@ -426,22 +426,74 @@
   border-radius: 7px;
 }
 
-/* The quick slot bar, lifted off the player's own screen. Pixel art, so it
-   is scaled by whole numbers and never smoothed. */
-.slots { margin: 10px 14px 0; }
-.slots-k {
-  font-size: 10px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--c-text-faint);
-  margin-bottom: 5px;
+/* ---------- the two numbers you read at a glance ---------- */
+
+/* Side by side and the same size on purpose. Mid-fight nobody parses a
+   layout; they look at one spot and leave. Two spots is the most that can
+   be read without stopping, so the panel promotes exactly two — how long
+   to the level, and how fast it is going — and everything else is for
+   when you are standing in town. */
+.hero-pair {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--s-3);
 }
-.slots-row { display: flex; gap: 4px; flex-wrap: wrap; }
-.slot-ic {
-  width: 32px;
-  height: 32px;
-  image-rendering: pixelated;
-  border: 1px solid var(--c-divider);
-  border-radius: 5px;
-  background: var(--c-elevated);
+.hero-pair .big { min-width: 0; }
+.hero-pair .big.end { text-align: right; }
+.hero-pair .u {
+  font-size: var(--fs-micro); color: var(--c-text-muted);
+  margin-top: 2px; white-space: nowrap;
+}
+
+/* ---------- the week ---------- */
+
+.week {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  background: rgba(13, 27, 21, 0.4);
+  flex: none;
+}
+.week[hidden] { display: none; }
+.week-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--s-3);
+}
+.week-lbl {
+  font-size: var(--fs-micro); font-weight: var(--fw-medium);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c-text-dim);
+}
+.week-sum {
+  font-size: var(--fs-micro); color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.week-bars {
+  display: flex; align-items: flex-end; gap: var(--s-1);
+  height: 46px; margin-top: var(--s-2);
+}
+.wd {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 3px; height: 100%;
+}
+.wd > i {
+  display: block; width: 100%;
+  border-radius: 2px 2px 0 0;
+  background: var(--c-accent-deep);
+}
+.wd.now > i { background: var(--c-accent); }
+/* A rest day keeps its column and loses its colour: the gap is the point. */
+.wd.off > i { background: var(--c-border); }
+.wd > span {
+  font-size: 9px; color: var(--c-text-faint);
+  line-height: 1; white-space: nowrap;
+}
+.wd.now > span { color: var(--c-accent-text); }
+.week-last {
+  margin-top: var(--s-2); padding-top: var(--s-2);
+  border-top: 1px solid var(--c-divider);
+  font-size: var(--fs-micro); color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
 }

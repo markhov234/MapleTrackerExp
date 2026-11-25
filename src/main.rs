@@ -96,6 +96,22 @@ fn range_totals(
     Ok(state.history.totals(range, Some(&current), now))
 }
 
+/// The week in review, and the session before this one.
+///
+/// One call rather than seven range roll-ups: the panel wants the whole
+/// picture at once, and the file is read once to build it.
+#[tauri::command]
+fn review(
+    state: tauri::State<'_, Tracked>,
+) -> Result<maple_tracker::history::Review, String> {
+    let current = state.session.lock().map_err(|_| "session lock poisoned")?.record();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    Ok(state.history.review(Some(&current), now))
+}
+
 /// Quit for real, from the tray's Quit item or the panel's footer button.
 ///
 /// The tray icon is removed first. A tray icon is owned by the app handle and
@@ -193,7 +209,7 @@ fn main() {
     let hotkey = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyE);
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![set_mini, hide_app, quit_app, range_totals])
+        .invoke_handler(tauri::generate_handler![set_mini, hide_app, quit_app, range_totals, review])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcut(hotkey)

@@ -39,7 +39,7 @@
 </head>
 <body>
 
-<div class="stage" id="stage" style="background-image:url('demo-bg.jpg')">
+<div class="stage" id="stage">
   <p class="stage-note">
     Demo over a real captured frame &mdash; press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> to toggle the panel
   </p>
@@ -108,18 +108,23 @@
       <button id="s-reset">Reset</button>
     </div>
 
+<!-- The two numbers somebody glances at mid-fight: how long until the
+         level, and how fast it is going. Everything else on the panel is
+         read deliberately; these two are read at a glance, so they are the
+         same size and nothing shares the row. -->
     <div class="hero">
-      <div class="t" id="h-time">2h 00m</div>
-      <div class="u" id="h-u">to level <b id="h-next">41</b> at the last 10 minutes' pace</div>
-      <div class="bar" id="h-barwrap"><i id="h-bar" style="width:40.6%"></i></div>
-      <div class="pc"><span id="h-pct">40.6% through level 40</span><span id="h-rem">174,864 EXP left</span></div>
-    </div>
-
-    <!-- Where else to farm. Sits directly under the time, because it only
-         exists to change that number. -->
-    <div class="slots" id="slots" hidden>
-      <div class="slots-k">in your quick slots</div>
-      <div class="slots-row" id="slots-row"></div>
+      <div class="hero-pair">
+        <div class="big">
+          <div class="t" id="h-time">&mdash;</div>
+          <div class="u" id="h-u">to level <b id="h-next">&mdash;</b></div>
+        </div>
+        <div class="big end">
+          <div class="t" id="h-rate">&mdash;</div>
+          <div class="u">EXP / hour</div>
+        </div>
+      </div>
+      <div class="bar" id="h-barwrap"><i id="h-bar" style="width:0%"></i></div>
+      <div class="pc"><span id="h-pct">&mdash;</span><span id="h-rem">&mdash;</span></div>
     </div>
 
     <div class="hint" id="theme-hint" hidden>
@@ -151,6 +156,17 @@
       <div class="cell"><div class="v" id="t-tolvl">&mdash;</div><div class="k">kills to level</div></div>
       <div class="cell"><div class="v" id="t-expkill">&mdash;</div><div class="k">EXP / kill</div></div>
       <div class="cell"><div class="v" id="t-party">&mdash;</div><div class="k">party bonus</div></div>
+    </div>
+
+<!-- Last time and this week. A session that vanishes when you quit is
+         a stopwatch; this is what makes it a record. -->
+    <div class="week" id="week" hidden>
+      <div class="week-top">
+        <span class="week-lbl">This week</span>
+        <span class="week-sum" id="week-sum">&mdash;</span>
+      </div>
+      <div class="week-bars" id="week-bars"></div>
+      <div class="week-last" id="week-last">&mdash;</div>
     </div>
 
     <div class="recap" id="recap" hidden></div>
@@ -299,15 +315,16 @@
     $("s-since").textContent = when;
 
     $("h-time").textContent = dur(T.active_secs);
+    $("h-rate").textContent = n(Math.round(T.rate));
     $("h-u").textContent =
       T.sessions + (T.sessions === 1 ? " session" : " sessions") +
       (T.levels ? ", " + T.levels + (T.levels === 1 ? " level" : " levels") + " gained" : "") +
-      " — grinding time only";
+      " grinding";
     // The bar is progress through the current level, which a month's total
     // has nothing to say about.
     $("h-barwrap").style.display = "none";
     $("h-pct").textContent = n(T.exp) + " EXP";
-    $("h-rem").textContent = n(Math.round(T.rate)) + " EXP / hour";
+    $("h-rem").textContent = T.levels + (T.levels === 1 ? " level" : " levels");
 
     $("t-played").textContent = dur(T.active_secs);
     $("t-exp").textContent = n(T.exp);
@@ -328,6 +345,7 @@
     $("h-next").textContent = S.level + 1;
     $("h-time").textContent =
       S.tracking && !S.userPaused && S.rate > 0 ? hhmm(hours) : "—";
+    $("h-rate").textContent = S.rate > 0 ? n(Math.round(S.rate)) : "—";
     $("h-bar").style.width = pct.toFixed(2) + "%";
     $("h-pct").textContent = pct.toFixed(1) + "% through level " + S.level;
     $("h-rem").textContent = n(remaining) + " EXP left";
@@ -453,35 +471,6 @@
    * with. Once a region has been read the hint goes away for good: the
    * panel keeps that colour, and nagging about it would be noise.
    */
-  /**
-   * The quick slot bar, drawn from the player's own screen.
-   *
-   * The pixels arrive as raw RGBA rather than an encoded image, so this
-   * paints them onto a canvas directly — no decoder, and nothing to go
-   * wrong between the app and the panel. They only arrive when the player
-   * reassigns a slot, so the last set is kept until a new one comes.
-   */
-  function showSlots(icons) {
-    if (!icons || !icons.length) return;
-    var host = $("slots-row");
-    if (!host) return;
-    host.textContent = "";
-    icons.forEach(function (ic) {
-      var cv = document.createElement("canvas");
-      cv.width = ic.w; cv.height = ic.h;
-      cv.className = "slot-ic";
-      var ctx = cv.getContext("2d");
-      var bin = atob(ic.rgba);
-      var img = ctx.createImageData(ic.w, ic.h);
-      for (var i = 0; i < img.data.length && i < bin.length; i++) {
-        img.data[i] = bin.charCodeAt(i);
-      }
-      ctx.putImageData(img, 0, 0);
-      host.appendChild(cv);
-    });
-    $("slots").hidden = false;
-  }
-
   function showThemeHint(s) {
     var el = $("theme-hint");
     if (!el) return;
@@ -655,6 +644,61 @@
   // as you play rather than jumping when you quit — the running session is
   // counted alongside the filed ones on the Rust side.
   var rangeTimer = null;
+  /* ---- last session, and the week ---------------------------------------
+     The live session already shows on the panel. What it cannot show is
+     whether tonight is better than last night, which is the question that
+     makes a tracker worth leaving running. One call brings back seven day
+     buckets and the session before this one; it is read from a file, so it
+     is polled slowly rather than on every frame. */
+  function renderWeek(r) {
+    var host = $("week");
+    if (!host || !r) return;
+    var days = r.days || [];
+    var any = days.some(function (d) { return d.exp > 0; }) || r.last;
+    if (!any) { host.hidden = true; return; }
+    host.hidden = false;
+
+    $("week-sum").textContent =
+      n(r.week.exp) + " EXP · " + dur(r.week.active_secs) +
+      (r.week.levels ? " · " + r.week.levels + (r.week.levels === 1 ? " level" : " levels") : "");
+
+    var bars = $("week-bars");
+    bars.textContent = "";
+    var top = r.best_exp || 1;
+    days.forEach(function (d) {
+      var col = document.createElement("div");
+      col.className = "wd" + (d.today ? " now" : "") + (d.exp ? "" : " off");
+      // A day with nothing in it keeps its column: a gap in the week is
+      // information, and a chart that skips rest days hides it.
+      var h = d.exp ? Math.max(3, Math.round((d.exp / top) * 34)) : 1;
+      var bar = document.createElement("i");
+      bar.style.height = h + "px";
+      var lab = document.createElement("span");
+      lab.textContent = d.label.split(" ")[0];
+      col.title = d.exp
+        ? d.label + ": " + n(d.exp) + " EXP in " + dur(d.active_secs) +
+          " · " + n(Math.round(d.rate)) + " / hour"
+        : d.label + ": nothing recorded";
+      col.appendChild(bar);
+      col.appendChild(lab);
+      bars.appendChild(col);
+    });
+
+    var last = r.last;
+    $("week-last").textContent = last
+      ? "Last session · " + n(last.exp_gained) + " EXP in " + dur(last.active_secs) +
+        (last.active_secs > 0
+          ? " · " + n(Math.round(last.exp_gained / last.active_secs * 3600)) + " / hour"
+          : "")
+      : "No earlier session recorded yet.";
+  }
+
+  function fetchWeek() {
+    var t = window.__TAURI__;
+    if (!t || !t.core || !t.core.invoke) return;
+    t.core.invoke("review").then(renderWeek).catch(function () {});
+  }
+
   function fetchTotals() {
     var t = window.__TAURI__;
     if (!t || !t.core || !t.core.invoke) return;
@@ -811,6 +855,10 @@
       return;
     }
     console.log("live capture listener attached");
+    // Read from disk, so slowly: the week only changes when a session is
+    // checkpointed, and the live figures come from the event below.
+    fetchWeek();
+    setInterval(fetchWeek, 30000);
     t.event.listen("session", function (ev) {
       var s = ev && ev.payload;
       if (!s) return;
@@ -838,7 +886,6 @@
       S.rate = s.rate || 0;
       applyRegionHue(s.region_hue);
       showThemeHint(s);
-      showSlots(s.slot_icons);
       S.playedSec = s.active_secs || 0;
 
       // The chat log is the only source for these, and it is only read once

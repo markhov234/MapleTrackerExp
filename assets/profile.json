@@ -860,22 +860,5 @@
     "w": 46,
     "h": 36,
     "chroma_floor": 70
-  },
-  "slots": {
-    "enabled": true,
-    "panel_w": 145,
-    "panel_h": 75,
-    "tolerance": 8,
-    "edge": 150,
-    "left": 9,
-    "top": 6,
-    "pitch_x": 34,
-    "pitch_y": 34,
-    "slot": 32,
-    "cols": 4,
-    "rows": 2,
-    "count_w": 24,
-    "count_h": 12,
-    "count_blue": 170
   }
 }

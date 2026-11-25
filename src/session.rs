@@ -7,19 +7,6 @@
 
 use serde::Serialize;
 
-/// One quick slot's artwork, as raw RGBA for the panel to draw.
-///
-/// The picture is the player's own screen, not a library of item sprites —
-/// which is what makes it right without anybody maintaining it. Raw bytes
-/// rather than a PNG so the app needs no encoder and the overlay no
-/// decoder: a canvas takes these as they are.
-#[derive(Clone, Debug, Serialize)]
-pub struct SlotIcon {
-    pub slot: u32,
-    pub w: u32,
-    pub h: u32,
-    pub rgba: String,
-}
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
@@ -68,13 +55,6 @@ pub struct Snapshot {
     /// player can fix in one click, and saying so is better than a theme
     /// that silently never changes.
     pub minimap_open: bool,
-    /// The quick slot artwork, as raw RGBA the panel draws itself.
-    ///
-    /// Sent only when the bar's contents change, which is a handful of
-    /// times a session against several frames a second, so the snapshot
-    /// stays small. `None` means "unchanged, keep what you have" and never
-    /// "there is nothing there".
-    pub slot_icons: Option<Vec<SlotIcon>>,
     pub ok: bool,
     /// Why there is no reading, when `ok` is false.
     pub status: String,
@@ -347,7 +327,6 @@ impl Session {
         Snapshot {
             region_hue: self.region_hue,
             minimap_open: self.minimap_open,
-            slot_icons: None,
             ok: self.level.is_some(),
             status: status.to_string(),
             level: self.level,
