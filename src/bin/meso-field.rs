@@ -2,6 +2,8 @@
 //!
 //!   meso-field check <frame.png> [...]   list every plate and what it reads
 //!   meso-field show  <frame.png>         draw the plates found, as ink maps
+//!   meso-field teach <frame.png> --total 983,602
+//!                                        cut the inventory's own digits
 //!   meso-field save  <frame.png>         turn the reader on in the profile
 //!
 //! Tweaks while checking: --plate --ink --min-w --min-h --max-h --gap --from-y
@@ -71,12 +73,12 @@ fn shots(args: &[String], profile: &Profile) -> Vec<Shot> {
     out
 }
 
-fn check(shots: &[Shot], cfg: &Mesos, p: &Profile) {
+fn check(shots: &[Shot], cfg: &Mesos) {
     for s in shots {
         let f = s.plate.frame();
         let began = std::time::Instant::now();
         let all = mesos::plates(&f, cfg);
-        let good = mesos::candidates(&f, cfg, p);
+        let good = mesos::candidates(&f, cfg);
         let took = began.elapsed();
         println!(
             "\n=== {} — client {}x{} — {} plate(s), {} readable  [{:?}]",
@@ -126,12 +128,50 @@ fn show(shots: &[Shot], cfg: &Mesos) {
     let f = s.plate.frame();
     for pl in mesos::plates(&f, cfg) {
         println!("\nplate ({}, {}) {}x{}  ('#' = ink)", pl.x, pl.y, pl.w, pl.h);
+        let roi = maple_tracker::ocr::Roi {
+            name: "mesos".into(),
+            x: pl.x, y: pl.y, w: pl.w, h: pl.h,
+            threshold: cfg.ink, invert: true,
+        };
+        let cuts = ocr::segment(&f, &roi, cfg.min_gap);
+        let mut line = String::new();
+        for c in &cuts {
+            let r = ocr::classify_cuts(std::slice::from_ref(c), &cfg.atlas, None);
+            if r.unknown > 0 {
+                line.push_str(&format!("[?{}x{}]", c.glyph.w, c.glyph.h));
+            } else {
+                line.push_str(&r.text);
+            }
+        }
+        println!("  cuts {}: {}", cuts.len(), line);
+        if std::env::args().any(|a| a == "--cuts") {
+            for c in &cuts {
+                println!("   cut dx={} {}x{}", c.dx, c.glyph.w, c.glyph.h);
+                for gy in 0..c.glyph.h {
+                    let row: String = (0..c.glyph.w)
+                        .map(|gx| if c.glyph.on_at(gx, gy) { '#' } else { '.' })
+                        .collect();
+                    println!("     {row}");
+                }
+            }
+        }
         for y in pl.y..(pl.y + pl.h).min(f.h) {
             let row: String = (pl.x..(pl.x + pl.w).min(f.w))
                 .map(|x| if f.grey(x, y) < cfg.ink { '#' } else { '.' })
                 .collect();
             println!("  {row}");
         }
+    }
+}
+
+fn write(profile: &mut Profile, cfg: Mesos) {
+    profile.mesos = Some(cfg);
+    match serde_json::to_string_pretty(profile)
+        .map_err(|e| e.to_string())
+        .and_then(|t| std::fs::write(profile_path(), t).map_err(|e| e.to_string()))
+    {
+        Ok(()) => println!("written to {}", profile_path()),
+        Err(e) => eprintln!("could not write: {e}"),
     }
 }
 
@@ -171,21 +211,53 @@ fn main() {
     }
 
     match mode.as_str() {
-        "check" => check(&shots, &cfg, &profile),
+        "check" => check(&shots, &cfg),
         "show" => show(&shots, &cfg),
-        "save" => {
-            cfg.enabled = true;
-            profile.mesos = Some(cfg);
-            match serde_json::to_string_pretty(&profile)
-                .map_err(|e| e.to_string())
-                .and_then(|t| std::fs::write(profile_path(), t).map_err(|e| e.to_string()))
-            {
-                Ok(()) => println!("written to {}, reader enabled", profile_path()),
-                Err(e) => eprintln!("could not write: {e}"),
+        "teach" => {
+            let Some(total) = value("--total") else {
+                eprintln!("teach needs --total <the number on screen, commas and all>");
+                std::process::exit(2);
+            };
+            for s in &shots {
+                match mesos::teach(&s.plate.frame(), &cfg, &total) {
+                    Ok(atlas) => {
+                        let before = cfg.atlas.len();
+                        cfg.atlas = atlas;
+                        println!(
+                            "{}: taught {} new, {} of 11 known",
+                            s.name,
+                            cfg.atlas.len() - before,
+                            cfg.atlas.len()
+                        );
+                    }
+                    Err(e) => println!("{}: {e}", s.name),
+                }
             }
+            let left = cfg.untaught();
+            if left.is_empty() {
+                println!("all eleven known — `meso-field save` will switch the reader on");
+            } else {
+                let list: Vec<String> = left.iter().map(|c| format!("{c:?}")).collect();
+                println!("still missing: {}", list.join(" "));
+            }
+            write(&mut profile, cfg);
+        }
+        "save" => {
+            let left = cfg.untaught();
+            if !left.is_empty() {
+                let list: Vec<String> = left.iter().map(|c| format!("{c:?}")).collect();
+                eprintln!(
+                    "refusing to switch it on: {} not taught yet — a total holding one of                      those would read as nothing at all",
+                    list.join(" ")
+                );
+                std::process::exit(1);
+            }
+            cfg.enabled = true;
+            write(&mut profile, cfg);
+            println!("reader enabled");
         }
         other => {
-            eprintln!("unknown mode {other:?}; expected check, show or save");
+            eprintln!("unknown mode {other:?}; expected check, show, teach or save");
             std::process::exit(2);
         }
     }

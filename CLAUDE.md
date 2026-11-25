@@ -141,7 +141,7 @@ rebuilding.
 ## Build, run, install
 
 ```powershell
-cargo test                       # 64 tests
+cargo test                       # 70 tests
 cargo build --release            # -> target/release/maple-tracker.exe
 npx -y @tauri-apps/cli@2 build   # -> the installer, below
 ```
@@ -166,6 +166,8 @@ them: `cargo run --features tools --bin <name>`.
 - `native-atlas` — teach the status-bar font
 - `notice-atlas` — teach the floating EXP/meso lines (`show`, `teach --at Y H --text "..."`, `read`, `events`)
 - `minimap-atlas` — the region badge
+- `meso-field` — the purse (`check`, `show [--cuts]`, `teach --total 983,602`,
+  `save`). `save` refuses while any of the eleven characters is untaught.
 - `harvest` — **watches the live game and saves only frames where the watched
   band changed** (`harvest notices 600`, `harvest slots 600`). Built because
   teaching needs frames with real text in them, and asking the player to pose
@@ -177,8 +179,11 @@ live game, so it carries the player's own and other players' character names.
 ## Where things stand
 
 Working and verified live: EXP, level, rate, time-to-level, session history,
-region theming from the minimap badge (reads ~117 deg), quick slot icons shown
-in the panel, kill counting switched on.
+region theming from the minimap badge (reads ~117 deg), kill counting, and
+the purse — read off the inventory's own meso total, verified across 160
+live frames (one plate readable out of twenty on screen, no false positives,
+and the readings tracked a real rising total: 984,239 -> 984,291 -> 984,345
+-> 984,394 -> 984,447).
 
 **Known gaps, roughly in order of what's worth doing next.**
 
@@ -192,27 +197,7 @@ in the panel, kill counting switched on.
      kill rule requires the literal word `received` rather than merely the
      absence of `bonus`/`party` — otherwise a party bonus double-counts every
      monster. Don't loosen that rule before teaching those letters.
-2. **Switch the meso reader on.** `src/mesos.rs` reads the inventory's
-   meso total — one number on a white plate — instead of adding up floating
-   lines, which makes the figure immune to the half-taught notice font and
-   gives the session's meso change as a difference of two readings rather
-   than an accumulation. Sales fall out of it: what the purse gained beyond
-   what was picked up off the ground, less what was spent.
-
-   It is written, unit-tested against plates painted from the real atlas,
-   and **disabled**, because no capture with the inventory open exists yet.
-   On a live frame with the window shut it finds nine bright plates and
-   reads a meso total from none of them, which is the right answer. To
-   finish: capture a frame with the inventory open, run
-   `meso-field check` on it, and if the digits read, `meso-field save`.
-   If they do not, the inventory draws its numbers in a different bitmap
-   from the status bar and needs its own eleven glyphs taught.
-
-   Note the inversion. Every other reader here looks for light text on a
-   dark client; this is dark text on a white plate, so the ROI carries
-   `invert: true` and the threshold means the opposite of usual.
-
-3. **Potions used (HP and MP).** Not done, and the route to it changed.
+2. **Potions used (HP and MP).** Not done, and the route to it changed.
    There *was* a quick-slot reader that found the slot panel and cut the
    eight icons out of it; it was removed at the user's request, because the
    icons took panel space and the counts — the part that would actually
@@ -225,11 +210,11 @@ in the panel, kill counting switched on.
    cycle). Telling HP from MP means watching which bar jumps when a count
    drops, which needs HP/MP reading restored — lost when `rois` and the
    `H`/`M`/`P`/`/` glyphs were dropped in the unstretch rewrite.
-4. **Monster kill attribution and images.** The Monsters tab has no data path
+3. **Monster kill attribution and images.** The Monsters tab has no data path
    at all — `S.monsters` is never populated from any snapshot field. The
    floating lines never name the monster, so identity needs a nametag reader.
    Images cannot be cropped from the screen; see "Prior art".
-5. Smaller: mesos spent isn't readable (could be estimated), the Inter font
+4. Smaller: mesos spent isn't readable (could be estimated), the Inter font
    isn't bundled, map data stops at level 60.
 
 ### The panel
@@ -256,6 +241,59 @@ Opening that link goes through `open_map_database`, a command that takes
 command that opens whatever address anything reaching the page hands it,
 and this webview renders text read off the game screen. If a second link is
 ever needed, add a second no-argument command, not a parameter.
+
+### The purse
+
+The meso figure is a **difference of two readings**, not an accumulation. The
+inventory prints the total; reading it means the number cannot drift, starts
+correct instead of at zero, and survives the half-taught notice font. Sales
+fall out of it — what the purse gained beyond what was picked up off the
+ground, less what was spent — and the panel shows that only once the log is
+actually counting pickups, because otherwise the subtraction reports every
+meso as a sale.
+
+Three things cost real time and are worth not rediscovering.
+
+**The inventory has its own typeface.** The status bar writes `9` five wide
+and seven tall with the loop closed at the bottom; the inventory writes it
+five by eight with a tail trailing off to the left. Same client, two fonts.
+The first live frame read nothing from a field whose digits were perfectly
+legible to a human, and that was why. `Mesos::atlas` holds the inventory's
+eleven characters, kept apart from `Profile::atlas` so teaching the purse can
+never cost the EXP field a glyph. A test asserts the two fonts differ; if it
+ever fails, one of the atlases was taught from the wrong field.
+
+**The number does not have the plate to itself.** There is a border down each
+side, a coin to its left and the word `MESOS` to its right. The reader used to
+require every glyph on the plate be recognised, which asks the atlas to read a
+coin — it never will. Each glyph is now classified on its own, unrecognised
+ones break the string, and the longest run that is *shaped* like a
+comma-grouped total is the answer. Nothing is guessed: an unknown glyph is
+still unknown, it just no longer condemns its neighbours.
+
+**The digits sit on the plate.** A row through them is bright, dark, bright,
+dark, so scanning for unbroken bright rows finds only the two or three of
+padding and the field is never tall enough to notice. `ink_gap` bridges dark
+interruptions up to 8px.
+
+Teaching it is `meso-field teach --total <the number on screen>`. The total
+has to come from somebody who can read it, because this is the bootstrap —
+there is no atlas yet, so nothing on the plate can be recognised. The window
+is then found by arithmetic rather than position: a run of cuts as long as
+the total, every digit the same height, every comma shorter, and **exactly
+one** run must qualify. Two would mean a second comma-grouped number of the
+same length is on screen, and picking one at random is how an atlas ends up
+with a `5` that is really a `6`.
+
+Getting all eleven took sitting through a live session: the total only moves
+when mesos drop, so `1 4 5 7` turned up only once the character was actually
+fighting with the inventory open. `meso-field save` refuses while any of the
+eleven is missing, and a test asserts the shipped profile knows them all — a
+reader that cannot spell `4` declines every total containing one.
+
+Note the inversion. Every other reader here looks for light text on a dark
+client; this is dark text on a white plate, so the ROI carries `invert: true`
+and the threshold means the opposite of usual.
 
 ### The portrait
 

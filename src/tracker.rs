@@ -373,7 +373,7 @@ impl Reader {
                 let (nw, nh) = scale.native(w, h);
                 let plate = crate::unstretch::plate_rgb(&view, scale, 0, 0, nw, nh);
                 if plate.w > 0 && plate.h > 0 {
-                    let found = crate::mesos::candidates(&plate.frame(), cfg, &self.profile);
+                    let found = crate::mesos::candidates(&plate.frame(), cfg);
                     if let Some(total) = self.purse.observe(&found) {
                         if self.last_purse_said != Some(total) {
                             self.last_purse_said = Some(total);

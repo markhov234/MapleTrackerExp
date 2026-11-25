@@ -437,6 +437,40 @@ mod tests {
         base + Duration::from_secs(secs)
     }
 
+    /// What the purse is for: a difference of two readings, not a running
+    /// sum, and sales as whatever it gained beyond what was picked up.
+    #[test]
+    fn the_purse_reports_a_difference_and_backs_out_what_was_picked_up() {
+        let mut s = Session::new(expcurve::to_next());
+
+        // Nothing at all until the inventory has been seen. A session that
+        // starts with it closed has no baseline to measure against, and
+        // guessing one would make the first reading look like profit.
+        let snap = s.snapshot("");
+        assert_eq!(snap.mesos_held, None);
+        assert_eq!(snap.mesos_made, None);
+        assert_eq!(snap.mesos_sold, None);
+
+        s.observe_purse(984_239);
+        // Still no sales figure: the log has said nothing, so "picked up"
+        // is zero for want of counting rather than because nothing dropped.
+        assert_eq!(s.snapshot("").mesos_sold, None);
+
+        s.observe_chat(&[crate::chat::Event::Meso { amount: 300 }]);
+        s.observe_purse(984_447);
+
+        let snap = s.snapshot("");
+        assert_eq!(snap.mesos_held, Some(984_447));
+        assert_eq!(snap.mesos_made, Some(208), "the difference, not an accumulation");
+        // Up 208 while 300 was picked up off the ground: 92 went out the
+        // door, which is spending, not a sale.
+        assert_eq!(snap.mesos_sold, Some(-92));
+
+        // The baseline is never revised, however many times it is read.
+        s.observe_purse(984_802);
+        assert_eq!(s.snapshot("").mesos_made, Some(563));
+    }
+
     #[test]
     fn tracks_gains_and_rate() {
         let t = expcurve::to_next();
