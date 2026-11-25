@@ -37,6 +37,17 @@ fn now_wall() -> i64 {
         .unwrap_or(0)
 }
 
+/// The character's own sprite, cut off the game screen.
+#[derive(Clone, Debug, Serialize)]
+pub struct Avatar {
+    pub w: u32,
+    pub h: u32,
+    /// Raw RGBA8 in base64, background keyed to transparent. Sent as pixels
+    /// rather than an encoded image so nothing has to decode it: the panel
+    /// paints it straight onto a canvas.
+    pub rgba: String,
+}
+
 /// What the overlay renders. Serialised straight to the webview.
 #[derive(Debug, Clone, Serialize)]
 pub struct Snapshot {
@@ -55,6 +66,10 @@ pub struct Snapshot {
     /// player can fix in one click, and saying so is better than a theme
     /// that silently never changes.
     pub minimap_open: bool,
+    /// Only set on the snapshot that carries a newly cut portrait. It is
+    /// tens of kilobytes and changes a few times a day, so the panel keeps
+    /// the last one it was given.
+    pub avatar: Option<Avatar>,
     pub ok: bool,
     /// Why there is no reading, when `ok` is false.
     pub status: String,
@@ -326,6 +341,9 @@ impl Session {
         };
         Snapshot {
             region_hue: self.region_hue,
+            // Attached by the tracker on the one snapshot that carries a
+            // freshly cut portrait; the session itself does not hold it.
+            avatar: None,
             minimap_open: self.minimap_open,
             ok: self.level.is_some(),
             status: status.to_string(),

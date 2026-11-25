@@ -48,7 +48,7 @@
 
     <!-- Compact bar. Tracking carries on unchanged while this is showing. -->
     <div class="mini" data-tauri-drag-region>
-      <img class="mini-av" src="character.png" alt="" onerror="this.remove()">
+      <img class="mini-av" id="m-sprite" src="character.png" alt="" onerror="this.remove()">
       <div class="mini-main">
         <div class="mini-t" id="m-time">2h 00m</div>
         <div class="mini-s" id="m-sub">Lv 40 &middot; 87,432 EXP/hr</div>
@@ -375,6 +375,45 @@
    * with. Once a region has been read the hint goes away for good: the
    * panel keeps that colour, and nagging about it would be noise.
    */
+  /* ---- the portrait ----------------------------------------------------
+     Cut off the player's own screen rather than drawn by anybody, so
+     whatever they are wearing today is what the panel shows. It arrives as
+     raw RGBA with the background already keyed to transparent — painted
+     straight onto a canvas, so nothing has to decode an image format and
+     there is no moment where a half-loaded picture is on screen.
+
+     It arrives a few times a day at most, on one snapshot, so this replaces
+     the <img> once and then leaves it alone. */
+  function showAvatar(a) {
+    if (!a || !a.w || !a.h || !a.rgba) return;
+    var bin;
+    try { bin = atob(a.rgba); } catch (e) { return; }
+    if (bin.length < a.w * a.h * 4) return;
+    var cv = document.createElement("canvas");
+    cv.width = a.w; cv.height = a.h;
+    var ctx = cv.getContext("2d");
+    var img = ctx.createImageData(a.w, a.h);
+    for (var i = 0; i < img.data.length; i++) img.data[i] = bin.charCodeAt(i);
+    ctx.putImageData(img, 0, 0);
+    var url = cv.toDataURL("image/png");
+    ["c-sprite", "m-sprite"].forEach(function (id) {
+      var el = $(id);
+      // `onerror` removes the placeholder when there is no bundled file, so
+      // the element may be gone; put a fresh one back in that case.
+      if (!el) {
+        var host = id === "c-sprite" ? document.querySelector(".avatar")
+                                     : document.querySelector(".mini");
+        if (!host) return;
+        el = document.createElement("img");
+        el.id = id;
+        el.alt = "";
+        if (id === "m-sprite") { el.className = "mini-av"; host.insertBefore(el, host.firstChild); }
+        else host.appendChild(el);
+      }
+      el.src = url;
+    });
+  }
+
   function showThemeHint(s) {
     var el = $("theme-hint");
     if (!el) return;
@@ -791,6 +830,7 @@
       S.rate = s.rate || 0;
       applyRegionHue(s.region_hue);
       showThemeHint(s);
+      if (s.avatar) showAvatar(s.avatar);
       S.playedSec = s.active_secs || 0;
 
       // The chat log is the only source for these, and it is only read once

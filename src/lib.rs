@@ -4,6 +4,7 @@
 //! read pixel buffers and do arithmetic. Nothing reads game memory, sends
 //! input, or inspects network traffic.
 
+pub mod avatar;
 pub mod chat;
 pub mod expcurve;
 pub mod history;

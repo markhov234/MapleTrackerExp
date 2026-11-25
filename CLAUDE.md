@@ -125,6 +125,7 @@ seconds of frames; and `ocr::locate` sweeps the cheap bottom-fifth band for
 | `src/session.rs` | live state and `Snapshot`, the single struct the UI receives |
 | `src/history.rs` | `sessions.jsonl` + `current.json`, range totals, and the weekly `review` |
 | `src/region.rs` | minimap badge -> region hue |
+| `src/avatar.rs` | find the player's own sprite; shared by the overlay and `find-character` |
 | `src/expcurve.rs` | EXP-to-next-level table |
 | `src/notes.rs` | file logging; a release build has no console, so `note!` is the only way to see anything |
 | `ui/overlay.html` | the panel |
@@ -235,6 +236,31 @@ command that opens whatever address anything reaching the page hands it,
 and this webview renders text read off the game screen. If a second link is
 ever needed, add a second no-argument command, not a parameter.
 
+### The portrait
+
+The panel's character picture is cut off the player's own screen, at launch
+and every five and a half hours after. The trick is that the client draws
+the character's name twice in the same bitmap font — on the status bar and
+on the label under the sprite — so the status bar's rendering *is* the
+search template, and no atlas or text recognition is needed. The box above
+the match is flood-filled inward from its border to key the background out.
+
+The hard part is not finding the name, it is finding the right one. The
+same string appears in chat, in a buddy list, on a shop sign, in another
+player's message, and those match the template just as well. Five
+plausibility checks separate them (`judge`), and the strongest signal is
+`side_ink`: a character's own label stands alone on its plate, while the
+same name in chat has other text hard against it. Every bound is set a long
+way from what the real sprite measures, because a missing portrait for one
+more minute costs nothing and a confidently wrong one is ugly.
+
+`find-character` is the workbench over the same module — it prints every
+score and writes the PNG. Its `--selftest` currently fails: it expects
+`captures/frame.png` to be the 2560x1440 reference it was tuned on, and the
+file on disk has since been replaced with a 1920x1032 capture. `captures/`
+is gitignored, so that baseline cannot live in the repo as things stand.
+Either commit a dedicated reference frame or point the self-test at one.
+
 ### Colour
 
 Two themes in `ui/tokens.css` — dark by default because the panel sits over
@@ -243,6 +269,12 @@ switches them and the choice is kept in `localStorage`. They share an
 identity rather than inverting: phthalo green and jade are structure in
 both, and only the accent changes, antique gold on obsidian in dark and
 phthalo green on ivory in light.
+
+Corners are near-square (`--r-sm: 2px`, and the pill is 3px, not 999px).
+With the rounding gone the panel separates its parts with rules and
+alignment instead: an accent edge down the left of each figure, one heavy
+top edge on the hero. If something needs to stand out, give it an edge, not
+a radius.
 
 That last part is a deliberate departure from the palette as specified,
 which lists Champagne as the light-mode accent. Champagne on ivory is about

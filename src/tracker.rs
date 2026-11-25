@@ -106,6 +106,12 @@ struct Reader {
     /// region is ridden out rather than announced.
     last_good: Option<Instant>,
     last_region: Instant,
+    /// When the portrait was last cut, and whether one has ever been cut.
+    /// Until the first success the search retries on the short timer.
+    last_avatar: Instant,
+    have_avatar: bool,
+    /// Waiting for the next snapshot to carry it out.
+    pending_avatar: Option<crate::session::Avatar>,
     /// The last badge hue written to the log, so a stable region is not
     /// announced every couple of seconds.
     last_hue: Option<f32>,
@@ -135,6 +141,23 @@ const SEARCH_EVERY: Duration = Duration::from_secs(1);
 /// handful of candidate windows is quick.
 const GIVE_UP: Duration = Duration::from_secs(4);
 
+/// How often the character's portrait is cut again.
+///
+/// A player changes hair, hat or cape a handful of times a month, so this is
+/// about keeping the panel from showing a stranger after a shopping trip
+/// rather than tracking anything. Long enough to cost nothing; short enough
+/// that an evening's session does not end with yesterday's outfit.
+const AVATAR_EVERY: Duration = Duration::from_secs(5 * 3600 + 1800);
+
+/// How often to retry while no portrait has been cut yet.
+///
+/// The search fails for ordinary reasons — the character is behind a window,
+/// off the edge of a cutscene, standing in front of a sign that repeats
+/// their name — and all of those pass on their own. Retrying briskly until
+/// the first success and slowly afterwards is the difference between a
+/// portrait within a minute of launch and one in five hours.
+const AVATAR_RETRY: Duration = Duration::from_secs(45);
+
 /// How often to look at the minimap's badge.
 ///
 /// Finding the panel is a search over the whole corner and costs about
@@ -143,8 +166,16 @@ const GIVE_UP: Duration = Duration::from_secs(4);
 const REGION_EVERY: Duration = Duration::from_secs(2);
 
 impl Reader {
-    /// Send a snapshot to the overlay.
-    fn emit(&mut self, snap: crate::session::Snapshot) {
+    /// Send a snapshot to the overlay, carrying a new portrait if one is
+    /// waiting.
+    ///
+    /// The portrait rides along with whatever snapshot goes out next rather
+    /// than on every one: it is tens of kilobytes, it changes a few times a
+    /// month, and the panel keeps whatever it was last given.
+    fn emit(&mut self, mut snap: crate::session::Snapshot) {
+        if let Some(a) = self.pending_avatar.take() {
+            snap.avatar = Some(a);
+        }
         if let Err(e) = self.app.emit(EVENT, snap) {
             crate::note!("[tracker] emit failed: {e}");
         }
@@ -241,6 +272,9 @@ impl Reader {
             last_trouble: None,
             last_good: None,
             last_region: Instant::now() - REGION_EVERY,
+            last_avatar: Instant::now() - AVATAR_EVERY,
+            have_avatar: false,
+            pending_avatar: None,
             last_hue: None,
         }
     }
@@ -263,6 +297,51 @@ impl Reader {
                 self.grid = None;
             }
             self.last_size = (w, h);
+        }
+
+        // The character's own portrait, cut off the game screen rather than
+        // drawn by anybody: whatever they are wearing today is what the
+        // panel shows. The name on the status bar is the search template —
+        // the client draws it a second time under the sprite — so this
+        // needs no atlas and no knowledge of what the character looks like.
+        let due = if self.have_avatar { AVATAR_EVERY } else { AVATAR_RETRY };
+        if now.duration_since(self.last_avatar) >= due {
+            self.last_avatar = now;
+            // On the client's own grid, like every other reader here, and
+            // for the same reason. The search works by matching the name as
+            // drawn on the status bar against the name as drawn under the
+            // sprite. On a stretched frame those two renderings of the same
+            // string land on different sub-pixel phases and binarize
+            // differently: measured live, the player's own tag scored 85%
+            // against a 90% gate, so it was never found. Unstretched, both
+            // are the client's own exact bitmap again.
+            let scale = self.grid.unwrap_or_else(|| self.profile.scale(w, h));
+            let (nw, nh) = scale.native(w, h);
+            let plate = crate::unstretch::plate_rgb(&view, scale, 0, 0, nw, nh);
+            let v = crate::avatar::View { w: plate.w, h: plate.h, px: plate.pixels() };
+            match crate::avatar::find(&v) {
+                Ok(sprite) => {
+                    crate::note!(
+                        "[tracker] character portrait cut, {}x{} ({} px of pixels)",
+                        sprite.w,
+                        sprite.h,
+                        sprite.rgba.len() / 4
+                    );
+                    self.pending_avatar = Some(crate::session::Avatar {
+                        w: sprite.w,
+                        h: sprite.h,
+                        rgba: crate::avatar::base64(&sprite.rgba),
+                    });
+                    self.have_avatar = true;
+                }
+                // Not worth a line every time: the character being behind a
+                // window is normal, and this retries by itself.
+                Err(e) => {
+                    if !self.have_avatar {
+                        crate::note!("[tracker] no portrait yet: {}", e.why());
+                    }
+                }
+            }
         }
 
         // Which region the player is in, taken from the badge beside the

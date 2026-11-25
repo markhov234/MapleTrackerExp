@@ -102,12 +102,18 @@
   --s-7: 32px;
   --s-8: 44px;
 
-  /* --- radius --- */
-  --r-xs: 4px;
-  --r-sm: 7px;
-  --r-md: 11px;
-  --r-lg: 16px;
-  --r-pill: 999px;
+  /* --- radius ---
+     Square, near enough. The panel reads as an instrument rather than a
+     card: edges meet, corners are a hint instead of a gesture, and the
+     only genuinely round thing left is the status dot. A pill is 3px here
+     rather than 999px, so the few things that were pills — the tags, the
+     database link — square off with everything else instead of becoming
+     the loudest shapes on the panel. */
+  --r-xs: 0px;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --r-pill: 3px;
 
   /* --- elevation: minimal, never heavy --- */
   --sh-none: none;

@@ -121,6 +121,12 @@ impl Plate {
         Frame { w: self.w, h: self.h, px: &self.px }
     }
 
+    /// The raw RGBA8 bytes, for a reader that wants the buffer rather than
+    /// a `Frame` — the portrait search, which works in RGBA throughout.
+    pub fn pixels(&self) -> &[u8] {
+        &self.px
+    }
+
     /// Move a plate-local point onto the client's grid.
     pub fn to_native(&self, x: u32, y: u32) -> (u32, u32) {
         (self.x + x, self.y + y)

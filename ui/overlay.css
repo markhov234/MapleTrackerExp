@@ -378,8 +378,27 @@
   color: var(--c-text-dim);
   background: var(--c-accent-softer);
   border: 1px solid var(--c-divider);
-  border-radius: 7px;
+  border-radius: var(--r-sm);
 }
+
+/* ---------- square, and lit from the edges ----------
+   With the corners gone the panel needs something else to separate its
+   parts, so the figures get a rule down their accent side rather than a
+   rounded box, and the hero loses its outline for a single heavy top edge.
+   Fewer boxes, more alignment. */
+.cell {
+  border-left: 2px solid var(--c-border-strong);
+  border-top: 0; border-right: 0; border-bottom: 0;
+  background: var(--c-well);
+  padding-left: var(--s-3);
+}
+.hero {
+  border: 0;
+  border-top: 2px solid var(--c-accent);
+  background: var(--c-accent-softer);
+}
+.week { border: 0; border-left: 2px solid var(--c-border-strong); }
+.reco { border-top: 0; border-right: 0; border-bottom: 0; border-left: 2px solid var(--c-info); }
 
 /* ---------- the two numbers you read at a glance ---------- */
 
@@ -435,7 +454,7 @@
 }
 .wd > i {
   display: block; width: 100%;
-  border-radius: 2px 2px 0 0;
+  border-radius: 0;
   background: var(--c-secondary);
 }
 .wd.now > i { background: var(--c-accent); }
