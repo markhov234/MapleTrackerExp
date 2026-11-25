@@ -106,6 +106,11 @@ struct Reader {
     /// region is ridden out rather than announced.
     last_good: Option<Instant>,
     last_region: Instant,
+    last_purse: Instant,
+    purse: crate::mesos::Watch,
+    /// The last total written to the log, so a purse sitting still is not
+    /// announced every second.
+    last_purse_said: Option<u64>,
     /// When the portrait was last cut, and whether one has ever been cut.
     /// Until the first success the search retries on the short timer.
     last_avatar: Instant,
@@ -157,6 +162,15 @@ const AVATAR_EVERY: Duration = Duration::from_secs(5 * 3600 + 1800);
 /// the first success and slowly afterwards is the difference between a
 /// portrait within a minute of launch and one in five hours.
 const AVATAR_RETRY: Duration = Duration::from_secs(45);
+
+/// How often the inventory's meso plate is looked for.
+///
+/// The purse changes on every drop, but the window is usually shut, so
+/// most of these cost one sweep for bright rectangles and find nothing.
+/// Once a second keeps the figure current the moment the player opens the
+/// inventory without searching the frame several times a second for a
+/// window that is not there.
+const PURSE_EVERY: Duration = Duration::from_secs(1);
 
 /// How often to look at the minimap's badge.
 ///
@@ -272,6 +286,9 @@ impl Reader {
             last_trouble: None,
             last_good: None,
             last_region: Instant::now() - REGION_EVERY,
+            last_purse: Instant::now() - PURSE_EVERY,
+            purse: crate::mesos::Watch::default(),
+            last_purse_said: None,
             last_avatar: Instant::now() - AVATAR_EVERY,
             have_avatar: false,
             pending_avatar: None,
@@ -339,6 +356,30 @@ impl Reader {
                 Err(e) => {
                     if !self.have_avatar {
                         crate::note!("[tracker] no portrait yet: {}", e.why());
+                    }
+                }
+            }
+        }
+
+        // The purse, read off the inventory window rather than added up
+        // from the floating lines. A number that can be read beats a
+        // number that has to be accumulated: it cannot drift, it starts
+        // correct instead of at zero, and the gap between how far it moved
+        // and how much was picked up is what was sold.
+        if let Some(cfg) = self.profile.mesos.as_ref().filter(|m| m.enabled) {
+            if now.duration_since(self.last_purse) >= PURSE_EVERY {
+                self.last_purse = now;
+                let scale = self.grid.unwrap_or_else(|| self.profile.scale(w, h));
+                let (nw, nh) = scale.native(w, h);
+                let plate = crate::unstretch::plate_rgb(&view, scale, 0, 0, nw, nh);
+                if plate.w > 0 && plate.h > 0 {
+                    let found = crate::mesos::candidates(&plate.frame(), cfg, &self.profile);
+                    if let Some(total) = self.purse.observe(&found) {
+                        if self.last_purse_said != Some(total) {
+                            self.last_purse_said = Some(total);
+                            crate::note!("[tracker] purse reads {total} mesos");
+                        }
+                        self.session.lock().unwrap().observe_purse(total);
                     }
                 }
             }

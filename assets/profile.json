@@ -860,5 +860,16 @@
     "w": 46,
     "h": 36,
     "chroma_floor": 70
+  },
+  "mesos": {
+    "enabled": false,
+    "plate": 215,
+    "ink": 140,
+    "min_w": 40,
+    "max_h": 20,
+    "min_h": 7,
+    "ink_gap": 8,
+    "min_gap": 1,
+    "from_y": 0.35
   }
 }

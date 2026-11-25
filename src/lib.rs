@@ -8,6 +8,7 @@ pub mod avatar;
 pub mod chat;
 pub mod expcurve;
 pub mod history;
+pub mod mesos;
 pub mod notes;
 pub mod ocr;
 pub mod region;

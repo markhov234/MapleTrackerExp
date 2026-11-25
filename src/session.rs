@@ -99,6 +99,17 @@ pub struct Snapshot {
     pub exp_from_chat: u64,
     pub exp_bonus: u64,
     pub mesos: u64,
+    /// The character's whole purse, as the inventory window prints it.
+    /// `None` until that window has been open long enough to read twice.
+    pub mesos_held: Option<u64>,
+    /// How much the purse has moved since the first reading this session.
+    /// Signed: an evening of shopping is a real answer, not a bug.
+    pub mesos_made: Option<i64>,
+    /// What the purse gained beyond what was picked up off the ground —
+    /// sales, less whatever was spent. Only offered when both halves are
+    /// actually being counted, because a subtraction with an uncounted
+    /// term is a guess wearing a number's clothes.
+    pub mesos_sold: Option<i64>,
     pub exp_per_kill: Option<f64>,
     /// Kills left at the current average, which is the question a kill
     /// count is actually asked in service of.
@@ -136,6 +147,10 @@ pub struct Session {
     region_pending: Option<f32>,
     minimap_open: bool,
     chat_seen: bool,
+    /// The purse when the inventory was first read this session, and the
+    /// most recent reading.
+    meso_start: Option<u64>,
+    meso_now: Option<u64>,
 }
 
 impl Session {
@@ -158,6 +173,8 @@ impl Session {
             region_pending: None,
             minimap_open: false,
             chat_seen: false,
+            meso_start: None,
+            meso_now: None,
         }
     }
 
@@ -243,6 +260,18 @@ impl Session {
 
         self.exp_into = absolute;
         self.last_seen = Some((now, absolute));
+    }
+
+    /// The purse, read off the inventory window.
+    ///
+    /// The first confirmed reading is the session's baseline and is never
+    /// revised: everything after it is measured against that. A session
+    /// that starts with the inventory closed simply has no meso figures
+    /// until it is opened, which is honest — there is nothing to compare
+    /// against before then.
+    pub fn observe_purse(&mut self, held: u64) {
+        self.meso_start.get_or_insert(held);
+        self.meso_now = Some(held);
     }
 
     /// Fold in what the chat log reported since the last read.
@@ -364,6 +393,18 @@ impl Session {
             measuring: self.measuring(),
             confidence: self.confidence,
             counting: self.chat_seen,
+            mesos_held: self.meso_now,
+            mesos_made: match (self.meso_start, self.meso_now) {
+                (Some(a), Some(b)) => Some(b as i64 - a as i64),
+                _ => None,
+            },
+            // Picked up is only being counted once the log has said
+            // something; before that this subtraction would report every
+            // meso as a sale.
+            mesos_sold: match (self.meso_start, self.meso_now, self.chat_seen) {
+                (Some(a), Some(b), true) => Some((b as i64 - a as i64) - self.chat.mesos as i64),
+                _ => None,
+            },
             kills: self.chat.kills,
             exp_from_chat: self.chat.exp_from_chat,
             exp_bonus: self.chat.exp_bonus,

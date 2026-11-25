@@ -125,6 +125,7 @@ seconds of frames; and `ocr::locate` sweeps the cheap bottom-fifth band for
 | `src/session.rs` | live state and `Snapshot`, the single struct the UI receives |
 | `src/history.rs` | `sessions.jsonl` + `current.json`, range totals, and the weekly `review` |
 | `src/region.rs` | minimap badge -> region hue |
+| `src/mesos.rs` | the purse, read off the inventory's own total |
 | `src/avatar.rs` | find the player's own sprite; shared by the overlay and `find-character` |
 | `src/expcurve.rs` | EXP-to-next-level table |
 | `src/notes.rs` | file logging; a release build has no console, so `note!` is the only way to see anything |
@@ -191,7 +192,27 @@ in the panel, kill counting switched on.
      kill rule requires the literal word `received` rather than merely the
      absence of `bonus`/`party` — otherwise a party bonus double-counts every
      monster. Don't loosen that rule before teaching those letters.
-2. **Potions used (HP and MP).** Not done, and the route to it changed.
+2. **Switch the meso reader on.** `src/mesos.rs` reads the inventory's
+   meso total — one number on a white plate — instead of adding up floating
+   lines, which makes the figure immune to the half-taught notice font and
+   gives the session's meso change as a difference of two readings rather
+   than an accumulation. Sales fall out of it: what the purse gained beyond
+   what was picked up off the ground, less what was spent.
+
+   It is written, unit-tested against plates painted from the real atlas,
+   and **disabled**, because no capture with the inventory open exists yet.
+   On a live frame with the window shut it finds nine bright plates and
+   reads a meso total from none of them, which is the right answer. To
+   finish: capture a frame with the inventory open, run
+   `meso-field check` on it, and if the digits read, `meso-field save`.
+   If they do not, the inventory draws its numbers in a different bitmap
+   from the status bar and needs its own eleven glyphs taught.
+
+   Note the inversion. Every other reader here looks for light text on a
+   dark client; this is dark text on a white plate, so the ROI carries
+   `invert: true` and the threshold means the opposite of usual.
+
+3. **Potions used (HP and MP).** Not done, and the route to it changed.
    There *was* a quick-slot reader that found the slot panel and cut the
    eight icons out of it; it was removed at the user's request, because the
    icons took panel space and the counts — the part that would actually
@@ -204,11 +225,11 @@ in the panel, kill counting switched on.
    cycle). Telling HP from MP means watching which bar jumps when a count
    drops, which needs HP/MP reading restored — lost when `rois` and the
    `H`/`M`/`P`/`/` glyphs were dropped in the unstretch rewrite.
-3. **Monster kill attribution and images.** The Monsters tab has no data path
+4. **Monster kill attribution and images.** The Monsters tab has no data path
    at all — `S.monsters` is never populated from any snapshot field. The
    floating lines never name the monster, so identity needs a nametag reader.
    Images cannot be cropped from the screen; see "Prior art".
-4. Smaller: mesos spent isn't readable (could be estimated), the Inter font
+5. Smaller: mesos spent isn't readable (could be estimated), the Inter font
    isn't bundled, map data stops at level 60.
 
 ### The panel

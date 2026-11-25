@@ -149,7 +149,7 @@
     <div class="grid2">
       <div class="cell"><div class="v" id="t-played">&mdash;</div><div class="k">played</div></div>
       <div class="cell"><div class="v" id="t-kills">&mdash;</div><div class="k">monsters killed</div></div>
-      <div class="cell"><div class="v pos" id="t-meso">&mdash;</div><div class="k">mesos picked up</div></div>
+      <div class="cell"><div class="v pos" id="t-meso">&mdash;</div><div class="k" id="t-meso-k">mesos this session</div></div>
       <div class="cell"><div class="v" id="t-sold">&mdash;</div><div class="k" id="t-sold-k">mesos from sales</div></div>
     </div>
 
@@ -299,24 +299,42 @@
 
     $("t-played").textContent = dur(S.playedSec);
     $("t-kills").textContent = un(S.kills);
+    // What the purse did this session, read off the inventory's own total
+    // rather than added up from the floating lines. Signed, because an
+    // evening of shopping is a real answer and not a bug — so this writes
+    // its own sign and does not reuse the "+" above.
+    var signed = function (el, v, cls) {
+      if (v === null || v === undefined) { el.textContent = DASH; el.className = "v"; return false; }
+      el.textContent = (v < 0 ? "−" : "+") + n(Math.abs(v));
+      el.className = "v " + (v < 0 ? "neg" : cls);
+      return true;
+    };
     var mEl = $("t-meso");
-    if (S.mesoEarned === null) {
+    if (S.mesoMade !== null && S.mesoMade !== undefined) {
+      signed(mEl, S.mesoMade, "pos");
+      $("t-meso-k").textContent = "mesos this session";
+    } else if (S.mesoEarned !== null && S.mesoEarned !== undefined) {
+      // No purse reading yet, so fall back to what was picked up — which
+      // is a different, smaller quantity, and is labelled as one.
+      signed(mEl, S.mesoEarned, "pos");
+      $("t-meso-k").textContent = "mesos picked up";
+    } else {
       mEl.textContent = DASH;
       mEl.className = "v";
-    } else {
-      mEl.textContent = "+" + n(S.mesoEarned);
-      mEl.className = "v pos";
+      $("t-meso-k").textContent = "mesos — open your inventory";
     }
-    // Mesos from selling is a different number from mesos picked up, and
-    // nothing reads it yet: the client does not float a line for a sale the
-    // way it does for a drop, so it has to come off the shop window. A dash
-    // and a reason, never a zero that looks like a quiet evening.
-    $("t-sold").textContent = S.mesoSold === null || S.mesoSold === undefined
-      ? DASH
-      : "+" + n(S.mesoSold);
-    $("t-sold-k").textContent = S.mesoSold === null || S.mesoSold === undefined
-      ? "mesos sold — not read yet"
-      : "mesos from sales";
+
+    // Sales are what the purse gained beyond what was picked up off the
+    // ground, less whatever was spent. It needs both halves counted, so
+    // until the inventory has been open and the log has said something it
+    // stays a dash with the reason on it.
+    if (!signed($("t-sold"), S.mesoSold, "pos")) {
+      $("t-sold-k").textContent = S.mesoMade === null || S.mesoMade === undefined
+        ? "sales — open your inventory"
+        : "sales — needs the pickup count";
+    } else {
+      $("t-sold-k").textContent = "mesos from sales, net of spending";
+    }
 
     // "Paused" is the user's choice; everything else is the tracker telling
     // us what it can or cannot see. Conflating them made a failed reading
@@ -832,6 +850,11 @@
       showThemeHint(s);
       if (s.avatar) showAvatar(s.avatar);
       S.playedSec = s.active_secs || 0;
+      // Read off the inventory window, so these arrive independently of
+      // whether the floating-line reader is calibrated.
+      S.mesoHeld = s.mesos_held;
+      S.mesoMade = s.mesos_made;
+      S.mesoSold = s.mesos_sold;
 
       // The chat log is the only source for these, and it is only read once
       // the chat box has been calibrated. Until the first event arrives they

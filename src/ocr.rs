@@ -299,6 +299,11 @@ pub struct Profile {
     /// not change.
     #[serde(default)]
     pub minimap: Option<crate::region::Minimap>,
+    /// Absent until the meso plate has been seen on a real frame. The
+    /// session's meso figures come from reading the inventory's own total
+    /// rather than adding up the floating lines.
+    #[serde(default)]
+    pub mesos: Option<crate::mesos::Mesos>,
 }
 
 impl Profile {
